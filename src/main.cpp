@@ -24,6 +24,8 @@
  * Boston, MA 02111-1307, USA.
  */
 
+//#define ENABLE_DEBUG
+
 #include <Arduino.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>               // local OTA update from Arduino IDE
@@ -94,6 +96,15 @@ void setup()
 
   // Bring up the web server
   web_server_setup();
+
+  // Start printing logs to http and mqtt
+  SerialDebug.onWrite([](const uint8_t *buffer, size_t size)
+  {
+    server.sendAll("/debug/console", WEBSOCKET_OP_TEXT, buffer, size);
+    String str = (char*)buffer;
+    mqtt_log(str);
+  });
+
   DBUGF("After web_server_setup: %d", ESPAL.getFreeHeap());
 
 #ifdef ENABLE_OTA

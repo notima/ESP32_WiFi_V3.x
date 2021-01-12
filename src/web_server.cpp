@@ -1085,11 +1085,6 @@ web_server_setup() {
   server.on("/debug/console$")->onFrame([](MongooseHttpWebSocketConnection *connection, int flags, uint8_t *data, size_t len) {
   });
 
-  SerialDebug.onWrite([](const uint8_t *buffer, size_t size)
-  {
-    server.sendAll("/debug/console", WEBSOCKET_OP_TEXT, buffer, size);
-  });
-
   server.on("/evse$", [](MongooseHttpServerRequest *request) {
     MongooseHttpServerResponseStream *response;
     if(false == requestPreProcess(request, response, CONTENT_TYPE_TEXT)) {

@@ -188,7 +188,16 @@ mqtt_connect()
   return true;
 }
 
+void
+mqtt_log(String msg) {
+  if(!config_mqtt_enabled() || !mqttclient.connected()) {
+    return;
+  }
 
+  String topic = mqtt_topic + "/log";
+
+  mqttclient.publish(topic, msg);
+}
 
 // -------------------------------------------------------------------
 // Publish status to MQTT
