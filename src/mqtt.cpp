@@ -15,6 +15,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <MongooseMqttClient.h>
+#include <queue>
 
 MongooseMqttClient mqttclient;
 
@@ -193,13 +194,25 @@ mqtt_connect()
   return true;
 }
 
+std::queue<String> logQueue;
+
 void
 mqtt_log(String msg) {
-  if(!config_mqtt_enabled() || !mqttclient.connected()) {
+  if(!config_mqtt_enabled()) {
+    return;
+  }
+
+  if(!mqttclient.connected()) {
+    logQueue.push(msg);
     return;
   }
 
   String topic = mqtt_topic + "/log";
+
+  while(!logQueue.empty()){
+    mqttclient.publish(topic, logQueue.front());
+    logQueue.pop();
+  }
 
   mqttclient.publish(topic, msg);
 }
