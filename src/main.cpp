@@ -54,6 +54,8 @@
 
 #include "RapiSender.h"
 
+#include "rfid.h"
+
 RapiSender rapiSender(&RAPI_PORT);
 
 unsigned long Timer1; // Timer for events once every 30 seconds
@@ -107,6 +109,8 @@ void setup()
 
   DBUGF("After web_server_setup: %d", ESPAL.getFreeHeap());
 
+  rfid_setup();
+
 #ifdef ENABLE_OTA
   ota_setup();
   DBUGF("After ota_setup: %d", ESPAL.getFreeHeap());
@@ -140,6 +144,7 @@ loop() {
   rapiSender.loop();
   divert_current_loop();
   time_loop();
+  rfid_loop();
   MicroTask.update();
 
   if(OpenEVSE.isConnected())
