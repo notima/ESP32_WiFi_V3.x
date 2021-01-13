@@ -15,14 +15,16 @@ boolean hasContact = false;
 unsigned long nextScan = 0;
 
 void rfid_setup(){
+
     lcd_display("RFID status:", 0, 0, 0, LCD_CLEAR_LINE);
+
     if(nfc.begin()){
         DEBUG.println("RFID module initialized");
         lcd_display("connected", 0, 1, 3000, LCD_CLEAR_LINE);
         rfidModuleActive = true;
     }else{
-        DEBUG.println("RFID is not connected or could not be initialized");
-        lcd_display("not connected", 0, 1, 3000, LCD_CLEAR_LINE);
+        DEBUG.println("RFID module not found");
+        lcd_display("not found", 0, 1, 3000, LCD_CLEAR_LINE);
     }
 }
 
@@ -39,7 +41,6 @@ String getUidHex(card NFCcard){
 void scanCard(){
     NFCcard = nfc.getInformation();
     //lcd_display("Tag detected!", 0, 0, 0, LCD_CLEAR_LINE);
-    //DEBUG.println("Tag detected");
 
     String uidHex = getUidHex(NFCcard);
 
@@ -57,13 +58,15 @@ void rfid_loop(){
 
     nextScan = millis() + SCAN_FREQ;
 
-    if(nfc.scan() && !hasContact){
-        hasContact = true;
+    boolean success = nfc.scan();
+
+    if(success && !hasContact){
         scanCard();
+        hasContact = true;
         return;
     }
 
-    if(!nfc.scan() && hasContact){
+    if(success && hasContact){
         hasContact = false;
     }
 }

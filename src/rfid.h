@@ -1,6 +1,5 @@
 #include <DFRobot_PN532.h>
 
-#define  PN532
 #define  SCAN_FREQ            1000
 #define  RFID_BLOCK_SIZE      16
 #define  PN532_IRQ            (2)
