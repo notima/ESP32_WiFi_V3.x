@@ -3,6 +3,7 @@
 #include "debug.h"
 #include "mqtt.h"
 #include "lcd.h"
+#include "app_config.h"
 #include "RapiSender.h"
 
 DFRobot_PN532_IIC  nfc(PN532_IRQ, PN532_POLLING); 
@@ -15,6 +16,8 @@ boolean hasContact = false;
 unsigned long nextScan = 0;
 
 void rfid_setup(){
+    if(!config_rfid_enabled())
+        return;
 
     lcd_display("RFID status:", 0, 0, 0, LCD_CLEAR_LINE);
 
@@ -25,6 +28,7 @@ void rfid_setup(){
     }else{
         DEBUG.println("RFID module not found");
         lcd_display("not found", 0, 1, 3000, LCD_CLEAR_LINE);
+        config_save_rfid(false);
     }
 }
 
@@ -53,20 +57,25 @@ void scanCard(){
 }
 
 void rfid_loop(){
-    if(!rfidModuleActive || millis() < nextScan)
+    if(!config_rfid_enabled() || millis() < nextScan)
         return;
+
+    if(!rfidModuleActive){
+        rfid_setup();
+        return;
+    }
 
     nextScan = millis() + SCAN_FREQ;
 
-    boolean success = nfc.scan();
+    boolean foundCard = nfc.scan();
 
-    if(success && !hasContact){
+    if(foundCard && !hasContact){
         scanCard();
         hasContact = true;
         return;
     }
 
-    if(success && hasContact){
+    if(!foundCard && hasContact){
         hasContact = false;
     }
 }

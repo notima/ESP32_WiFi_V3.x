@@ -132,6 +132,7 @@ ConfigOpt *opts[] =
   new ConfigOptVirtualBool(flagsOpt,CONFIG_SERVICE_TESLA,CONFIG_SERVICE_TESLA, "tesla_enabled", "te"),
   new ConfigOptVirtualBool(flagsOpt, CONFIG_SERVICE_DIVERT, CONFIG_SERVICE_DIVERT, "divert_enabled", "de"),
   new ConfigOptVirtualBool(flagsOpt, CONFIG_PAUSE_USES_DISABLED, CONFIG_PAUSE_USES_DISABLED, "pause_uses_disabled", "pd"),
+  new ConfigOptVirtualBool(flagsOpt, CONFIG_RFID, CONFIG_RFID, "rfid_enabled", "rf"),
   new ConfigOptVirtualMqttProtocol(flagsOpt, "mqtt_protocol", "mprt"),
   new ConfigOptVirtualChargeMode(flagsOpt, "charge_mode", "chmd")
 };
@@ -337,6 +338,16 @@ config_save_ohm(bool enable, String qohm)
   }
 
   config.set("ohm", qohm);
+  config.set("flags", newflags);
+  config.commit();
+}
+
+void
+config_save_rfid(bool enable){
+  uint32_t newflags = flags & ~CONFIG_RFID;
+  if(enable) {
+    newflags |= CONFIG_RFID;
+  }
   config.set("flags", newflags);
   config.commit();
 }
