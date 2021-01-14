@@ -204,6 +204,9 @@ mqtt_log(String msg) {
 
   if(!mqttclient.connected()) {
     logQueue.push(msg);
+    if(logQueue.size() > 100){
+      logQueue.pop();
+    }
     return;
   }
 
