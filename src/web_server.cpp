@@ -772,6 +772,30 @@ handleUpdateGet(MongooseHttpServerRequest *request) {
   request->send(response);
 }
 
+// -------------------------------------------------------------------
+// Send RFID status info
+// url: /rfid/status
+// -------------------------------------------------------------------
+void 
+handleRFIDStatusGet(MongooseHttpServerRequest *request) {
+  MongooseHttpServerResponseStream *response;
+  if(false == requestPreProcess(request, response, CONTENT_TYPE_JSON)) {
+    return;
+  }
+
+  const size_t capacity = JSON_OBJECT_SIZE(40) + 1024;
+  DynamicJsonDocument doc(capacity);
+
+  doc["enabled"] = config_rfid_enabled();
+
+  response->setCode(200);
+  serializeJson(doc, *response);
+
+  response->setContentType(CONTENT_TYPE_JSON);
+  response->addHeader("Access-Control-Allow-Origin", "*");
+  request->send(response);
+}
+
 static MongooseHttpServerResponseStream *upgradeResponse = NULL;
 
 void
@@ -1056,6 +1080,9 @@ web_server_setup() {
   server.on("/apoff$", handleAPOff);
   server.on("/divertmode$", handleDivertMode);
   server.on("/emoncms/describe$", handleDescribe);
+
+  // Handle RFID controls
+  server.on("/rfid/status", handleRFIDStatusGet);
 
   // Simple Firmware Update Form
   server.on("/update$")->
