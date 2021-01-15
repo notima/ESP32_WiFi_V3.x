@@ -34,6 +34,7 @@ typedef const __FlashStringHelper *fstr_t;
 #include "espal.h"
 #include "time_man.h"
 #include "tesla_client.h"
+#include "rfid.h"
 
 MongooseHttpServer server;          // Create class for Web server
 
@@ -787,6 +788,50 @@ handleRFIDStatusGet(MongooseHttpServerRequest *request) {
   DynamicJsonDocument doc(capacity);
 
   doc["enabled"] = config_rfid_enabled();
+  doc["status"] = rfid_status();
+
+  response->setCode(200);
+  serializeJson(doc, *response);
+
+  response->setContentType(CONTENT_TYPE_JSON);
+  response->addHeader("Access-Control-Allow-Origin", "*");
+  request->send(response);
+}
+
+void
+handleRFIDStored(MongooseHttpServerRequest *request) 
+{
+  MongooseHttpServerResponseStream *response;
+  if(false == requestPreProcess(request, response)) {
+    return;
+  }
+
+  if(HTTP_GET == request->method()) {
+    handleConfigGet(request, response);
+  } else if(HTTP_POST == request->method()) {
+    handleConfigPost(request, response); 
+  } else if(HTTP_OPTIONS == request->method()) {
+    response->setCode(200);
+  } else {
+    response->setCode(405);
+  }
+
+  request->send(response);
+}
+
+// -------------------------------------------------------------------
+// Send stored RFID tag uids
+// url: /rfid/stored
+// -------------------------------------------------------------------
+void 
+handleRFIDStoredGet(MongooseHttpServerRequest *request) {
+  MongooseHttpServerResponseStream *response;
+  if(false == requestPreProcess(request, response, CONTENT_TYPE_JSON)) {
+    return;
+  }
+
+  const size_t capacity = JSON_OBJECT_SIZE(40) + 1024;
+  DynamicJsonDocument doc(capacity);
 
   response->setCode(200);
   serializeJson(doc, *response);
@@ -1083,6 +1128,7 @@ web_server_setup() {
 
   // Handle RFID controls
   server.on("/rfid/status", handleRFIDStatusGet);
+  server.on("/rfid/stored", handleRFIDStored);
 
   // Simple Firmware Update Form
   server.on("/update$")->

@@ -1,3 +1,7 @@
+#define STATUS_NOT_ENABLED 0
+#define STATUS_NOT_FOUND 1
+#define STATUS_ACTIVE 2
+
 #include "rfid.h"
 
 #include "debug.h"
@@ -10,25 +14,30 @@ DFRobot_PN532_IIC  nfc(PN532_IRQ, PN532_POLLING);
 struct card NFCcard;
 extern RapiSender rapiSender;
 
-boolean rfidModuleActive;
+uint8_t status = STATUS_NOT_ENABLED;
 boolean hasContact = false;
 
 unsigned long nextScan = 0;
 
 void rfid_setup(){
-    if(!config_rfid_enabled())
+    if(!config_rfid_enabled()){
+        DEBUG.println("RFID disabled");
+        status = STATUS_NOT_ENABLED;
         return;
+    }
+    DEBUG.println("RFID enabled");
 
     lcd_display("RFID status:", 0, 0, 0, LCD_CLEAR_LINE);
 
     if(nfc.begin()){
         DEBUG.println("RFID module initialized");
         lcd_display("connected", 0, 1, 3000, LCD_CLEAR_LINE);
-        rfidModuleActive = true;
+        status = STATUS_ACTIVE;
     }else{
         DEBUG.println("RFID module not found");
         lcd_display("not found", 0, 1, 3000, LCD_CLEAR_LINE);
         config_save_rfid(false);
+        status = STATUS_NOT_FOUND;
     }
 }
 
@@ -44,7 +53,7 @@ String getUidHex(card NFCcard){
 
 void scanCard(){
     NFCcard = nfc.getInformation();
-    //lcd_display("Tag detected!", 0, 0, 0, LCD_CLEAR_LINE);
+    lcd_display("Tag detected!", 0, 0, 0, LCD_CLEAR_LINE);
 
     String uidHex = getUidHex(NFCcard);
 
@@ -52,15 +61,22 @@ void scanCard(){
     data["rfid"] = uidHex;
     mqtt_publish(data);
 
-    //lcd_display(uidHex, 0, 1, 3000, LCD_CLEAR_LINE);
-    //rapiSender.sendCmd(F("$F1"));
+    lcd_display(uidHex, 0, 1, 3000, LCD_CLEAR_LINE);
+    rapiSender.sendCmd(F("$F1"));
 }
 
 void rfid_loop(){
-    if(!config_rfid_enabled() || millis() < nextScan)
+    if(millis() < nextScan){
         return;
+    }
 
-    if(!rfidModuleActive){
+    if(!config_rfid_enabled()){
+        if(status != STATUS_NOT_FOUND)
+            status = STATUS_NOT_ENABLED;
+        return;
+    }
+
+    if(status != STATUS_ACTIVE){
         rfid_setup();
         return;
     }
@@ -78,4 +94,8 @@ void rfid_loop(){
     if(!foundCard && hasContact){
         hasContact = false;
     }
+}
+
+uint8_t rfid_status(){
+    return status;
 }

@@ -8,3 +8,4 @@
 
 void rfid_setup();
 void rfid_loop();
+uint8_t rfid_status();
