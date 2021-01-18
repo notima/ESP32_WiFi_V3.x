@@ -1,4 +1,5 @@
 #include <DFRobot_PN532.h>
+#include <ArduinoJson.h>
 
 #define  SCAN_FREQ            200
 #define  RFID_BLOCK_SIZE      16
@@ -9,3 +10,7 @@
 void rfid_setup();
 void rfid_loop();
 uint8_t rfid_status();
+
+DynamicJsonDocument rfid_get_stored_tags();
+void rfid_wait_for_tag(uint8_t seconds);
+DynamicJsonDocument rfid_poll();

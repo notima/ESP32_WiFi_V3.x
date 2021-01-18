@@ -19,6 +19,11 @@ boolean hasContact = false;
 
 unsigned long nextScan = 0;
 
+// How many more seconds to wait for tag
+uint8_t waitingForTag = 0;
+unsigned long stopWaiting = 0;
+String foundUID;
+
 void rfid_setup(){
     if(!config_rfid_enabled()){
         DEBUG.println("RFID disabled");
@@ -53,16 +58,19 @@ String getUidHex(card NFCcard){
 
 void scanCard(){
     NFCcard = nfc.getInformation();
-    lcd_display("Tag detected!", 0, 0, 0, LCD_CLEAR_LINE);
-
     String uidHex = getUidHex(NFCcard);
 
-    DynamicJsonDocument data(4096);
-    data["rfid"] = uidHex;
-    mqtt_publish(data);
-
-    lcd_display(uidHex, 0, 1, 3000, LCD_CLEAR_LINE);
-    rapiSender.sendCmd(F("$F1"));
+    if(waitingForTag > 0){
+        waitingForTag = 0;
+        foundUID = uidHex;
+        lcd_display("Tag detected!", 0, 0, 0, LCD_CLEAR_LINE);
+        lcd_display(uidHex, 0, 1, 3000, LCD_CLEAR_LINE);
+    }else{
+        DynamicJsonDocument data(4096);
+        data["rfid"] = uidHex;
+        mqtt_publish(data);
+        rapiSender.sendCmd(F("$F1"));
+    }
 }
 
 void rfid_loop(){
@@ -94,8 +102,62 @@ void rfid_loop(){
     if(!foundCard && hasContact){
         hasContact = false;
     }
+
+    if(waitingForTag > 0){
+        waitingForTag = (stopWaiting - millis()) / 1000;
+        String msg = "tag... ";
+        msg.concat(waitingForTag);
+        lcd_display(msg, 0, 1, 1000, LCD_CLEAR_LINE);
+    }
 }
 
 uint8_t rfid_status(){
     return status;
+}
+
+DynamicJsonDocument rfid_get_stored_tags(){
+    // compute the required size
+    const size_t capacity = JSON_ARRAY_SIZE(3);
+
+    // allocate the memory for the document
+    DynamicJsonDocument doc(capacity);
+
+    // create an empty array
+    JsonArray array = doc.to<JsonArray>();
+
+    // add some values
+    array.add("hello");
+    array.add(42);
+    array.add(3.14);
+
+    return doc;
+}
+
+void rfid_wait_for_tag(uint8_t seconds){
+    if(!config_rfid_enabled())
+        return;
+    waitingForTag = seconds;
+    stopWaiting = millis() + seconds * 1000;
+    foundUID = emptyString;
+    lcd_display("Waiting for RFID", 0, 0, seconds * 1000, LCD_CLEAR_LINE);
+}
+
+DynamicJsonDocument rfid_poll() {
+    const size_t capacity = JSON_ARRAY_SIZE(3);
+    DynamicJsonDocument doc(capacity);
+    if(waitingForTag > 0){
+        // respons with remainding time
+        doc["status"] = "waiting";
+        doc["timeLeft"] = waitingForTag;
+    } 
+    else if(emptyString.compareTo(foundUID) != 0){
+        // respond with the scanned tags uid and reset
+        doc["status"] = "done";
+        doc["scanned"] = foundUID;
+        foundUID = emptyString;
+    }
+    else  {
+        doc["status"] = "notStarted";
+    }
+    return doc;
 }
