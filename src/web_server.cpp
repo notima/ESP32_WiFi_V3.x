@@ -655,6 +655,11 @@ handleConfigGet(MongooseHttpServerRequest *request, MongooseHttpServerResponseSt
   JsonArray http_supported_protocols = doc.createNestedArray("http_supported_protocols");
   http_supported_protocols.add("http");
   http_supported_protocols.add("https");
+
+  JsonArray stored_rfid_tags = doc.createNestedArray("stored_rfid_tags");
+  stored_rfid_tags.add("11 22 33 44");
+  stored_rfid_tags.add("66 77 88 99");
+  stored_rfid_tags.add("AA BB CC DD");
   
   config_serialize(doc, true, false, true);
 
@@ -753,6 +758,30 @@ void handleDescribe(MongooseHttpServerRequest *request) {
   request->send(response);
 }
 
+void handleAddRFID(MongooseHttpServerRequest *request) {
+  MongooseHttpServerResponseStream *response;
+  if(false == requestPreProcess(request, response, CONTENT_TYPE_TEXT)) {
+    return;
+  }
+  response->setCode(200);
+  response->setContentType(CONTENT_TYPE_TEXT);
+  response->addHeader("Access-Control-Allow-Origin", "*");
+  request->send(response);
+  rfid_wait_for_tag(60);
+}
+
+void handlePollRFID(MongooseHttpServerRequest *request) {
+  MongooseHttpServerResponseStream *response;
+  if(false == requestPreProcess(request, response, CONTENT_TYPE_JSON)) {
+    return;
+  }
+  response->setCode(200);
+  response->setContentType(CONTENT_TYPE_JSON);
+  response->addHeader("Access-Control-Allow-Origin", "*");
+  serializeJson(rfid_poll(), *response);
+  request->send(response);
+}
+
 // -------------------------------------------------------------------
 // Update firmware
 // url: /update
@@ -770,74 +799,6 @@ handleUpdateGet(MongooseHttpServerRequest *request) {
         "<input type='file' name='firmware'> "
         "<input type='submit' value='Update'>"
       "</form></html>"));
-  request->send(response);
-}
-
-// -------------------------------------------------------------------
-// Send RFID status info
-// url: /rfid/status
-// -------------------------------------------------------------------
-void 
-handleRFIDStatusGet(MongooseHttpServerRequest *request) {
-  MongooseHttpServerResponseStream *response;
-  if(false == requestPreProcess(request, response, CONTENT_TYPE_JSON)) {
-    return;
-  }
-
-  const size_t capacity = JSON_OBJECT_SIZE(40) + 1024;
-  DynamicJsonDocument doc(capacity);
-
-  doc["enabled"] = config_rfid_enabled();
-  doc["status"] = rfid_status();
-
-  response->setCode(200);
-  serializeJson(doc, *response);
-
-  response->setContentType(CONTENT_TYPE_JSON);
-  response->addHeader("Access-Control-Allow-Origin", "*");
-  request->send(response);
-}
-
-void
-handleRFIDStored(MongooseHttpServerRequest *request) 
-{
-  MongooseHttpServerResponseStream *response;
-  if(false == requestPreProcess(request, response)) {
-    return;
-  }
-
-  if(HTTP_GET == request->method()) {
-    handleConfigGet(request, response);
-  } else if(HTTP_POST == request->method()) {
-    handleConfigPost(request, response); 
-  } else if(HTTP_OPTIONS == request->method()) {
-    response->setCode(200);
-  } else {
-    response->setCode(405);
-  }
-
-  request->send(response);
-}
-
-// -------------------------------------------------------------------
-// Send stored RFID tag uids
-// url: /rfid/stored
-// -------------------------------------------------------------------
-void 
-handleRFIDStoredGet(MongooseHttpServerRequest *request) {
-  MongooseHttpServerResponseStream *response;
-  if(false == requestPreProcess(request, response, CONTENT_TYPE_JSON)) {
-    return;
-  }
-
-  const size_t capacity = JSON_OBJECT_SIZE(40) + 1024;
-  DynamicJsonDocument doc(capacity);
-
-  response->setCode(200);
-  serializeJson(doc, *response);
-
-  response->setContentType(CONTENT_TYPE_JSON);
-  response->addHeader("Access-Control-Allow-Origin", "*");
   request->send(response);
 }
 
@@ -1125,10 +1086,10 @@ web_server_setup() {
   server.on("/apoff$", handleAPOff);
   server.on("/divertmode$", handleDivertMode);
   server.on("/emoncms/describe$", handleDescribe);
+  server.on("/rfid/add$", handleAddRFID);
 
-  // Handle RFID controls
-  server.on("/rfid/status", handleRFIDStatusGet);
-  server.on("/rfid/stored", handleRFIDStored);
+  // Check status of RFID scan
+  server.on("/rfid/poll$", handlePollRFID);
 
   // Simple Firmware Update Form
   server.on("/update$")->
