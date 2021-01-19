@@ -66,6 +66,9 @@ String tesla_username;
 String tesla_password;
 int tesla_vehidx;
 
+// RFID storage
+String rfid_storage;
+
 String esp_hostname_default = "openevse-"+ESPAL.getShortId();
 
 void config_changed(String name);
@@ -119,6 +122,9 @@ ConfigOpt *opts[] =
   new ConfigOptDefenition<String>(tesla_username, "", "tesla_username", "tu"),
   new ConfigOptSecret(tesla_password, "", "tesla_password", "tp"),
   new ConfigOptDefenition<int>(tesla_vehidx, -1, "tesla_vehidx", "ti"),
+
+// RFID storage
+  new ConfigOptDefenition<String>(rfid_storage, "", "rfid_storage", "rs"),
 
 // Flags
   &flagsOpt,
@@ -343,12 +349,13 @@ config_save_ohm(bool enable, String qohm)
 }
 
 void
-config_save_rfid(bool enable){
+config_save_rfid(bool enable, String storage){
   uint32_t newflags = flags & ~CONFIG_RFID;
   if(enable) {
     newflags |= CONFIG_RFID;
   }
   config.set("flags", newflags);
+  config.set("rfid_storage", rfid_storage);
   config.commit();
 }
 

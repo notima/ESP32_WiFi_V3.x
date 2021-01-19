@@ -11,6 +11,7 @@ void rfid_setup();
 void rfid_loop();
 uint8_t rfid_status();
 
+void rfid_store_tag(String uid);
 DynamicJsonDocument rfid_get_stored_tags();
 void rfid_wait_for_tag(uint8_t seconds);
 DynamicJsonDocument rfid_poll();

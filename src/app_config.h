@@ -42,6 +42,9 @@ extern String mqtt_grid_ie;
 extern String mqtt_vrms;
 extern String mqtt_announce_topic;
 
+// RFID storage
+extern String rfid_storage;
+
 // Time
 extern String time_zone;
 
@@ -157,7 +160,7 @@ extern void config_save_ohm(bool enable, String qohm);
 // -------------------------------------------------------------------
 // Save RFID settings
 // -------------------------------------------------------------------
-extern void config_save_rfid(bool enable);
+extern void config_save_rfid(bool enable, String storage);
 
 // -------------------------------------------------------------------
 // Save the flags
