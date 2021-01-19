@@ -655,11 +655,6 @@ handleConfigGet(MongooseHttpServerRequest *request, MongooseHttpServerResponseSt
   JsonArray http_supported_protocols = doc.createNestedArray("http_supported_protocols");
   http_supported_protocols.add("http");
   http_supported_protocols.add("https");
-
-  JsonArray stored_rfid_tags = doc.createNestedArray("stored_rfid_tags");
-  stored_rfid_tags.add("11 22 33 44");
-  stored_rfid_tags.add("66 77 88 99");
-  stored_rfid_tags.add("AA BB CC DD");
   
   config_serialize(doc, true, false, true);
 
