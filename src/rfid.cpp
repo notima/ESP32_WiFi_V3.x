@@ -53,6 +53,7 @@ String getUidHex(card NFCcard){
         sprintf(hex,"%x",NFCcard.uid[i]);
         uidHex = uidHex + hex + " ";
     }
+    uidHex.trim();
     return uidHex;
 }
 
@@ -82,14 +83,29 @@ void scanCard(){
     if(waitingForTag > 0){
         waitingForTag = 0;
         cardFound = true;
-        rfid_store_tag(getUidHex(NFCcard));
         lcd_display("Tag detected!", 0, 0, 0, LCD_CLEAR_LINE);
         lcd_display(uidHex, 0, 1, 3000, LCD_CLEAR_LINE);
     }else{
+        // Check if tag is stored locally
+        char storedTags[rfid_storage.length()];
+        rfid_storage.toCharArray(storedTags, rfid_storage.length());
+        char* storedTag = strtok(storedTags, ",");
+        while(storedTag)
+        {
+            String storedTagStr = storedTag;
+            storedTagStr.trim();
+            uidHex.trim();
+            if(storedTagStr.compareTo(uidHex) == 0){
+                rapiSender.sendCmd(F("$FE"));
+                break;
+            }
+            storedTag = strtok(NULL, ",");
+        }
+
+        // Send to MQTT broker
         DynamicJsonDocument data(4096);
         data["rfid"] = uidHex;
         mqtt_publish(data);
-        rapiSender.sendCmd(F("$F1"));
     }
 }
 

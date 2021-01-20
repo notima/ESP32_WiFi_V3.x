@@ -310,6 +310,11 @@ void input_setup()
 
   OpenEVSE.onState([](uint8_t evse_state, uint8_t pilot_state, uint32_t current_capacity, uint32_t vflags)
   {
+    // Disable if disconnected
+    if(state < 255 && evse_state == 1){
+      rapiSender.sendCmd(F("$FD"));
+    }
+
     // Update our global state
     DBUGVAR(evse_state);
     state = evse_state;
