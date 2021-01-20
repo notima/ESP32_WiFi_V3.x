@@ -87,8 +87,8 @@ void scanCard(){
         lcd_display(uidHex, 0, 1, 3000, LCD_CLEAR_LINE);
     }else{
         // Check if tag is stored locally
-        char storedTags[rfid_storage.length()];
-        rfid_storage.toCharArray(storedTags, rfid_storage.length());
+        char storedTags[rfid_storage.length() + 1];
+        rfid_storage.toCharArray(storedTags, rfid_storage.length()+1);
         char* storedTag = strtok(storedTags, ",");
         while(storedTag)
         {
