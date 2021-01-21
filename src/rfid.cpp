@@ -9,6 +9,8 @@
 #include "lcd.h"
 #include "app_config.h"
 #include "RapiSender.h"
+#include "input.h"
+#include "openevse.h"
 
 DFRobot_PN532_IIC  nfc(PN532_IRQ, PN532_POLLING); 
 struct card NFCcard;
@@ -125,6 +127,18 @@ void rfid_loop(){
         return;
     }
 
+    if(waitingForTag > 0){
+        waitingForTag = (stopWaiting - millis()) / 1000;
+        String msg = "tag... ";
+        msg.concat(waitingForTag);
+        lcd_display("Waiting for RFID", 0, 0, 0, LCD_CLEAR_LINE);
+        lcd_display(msg, 0, 1, 1000, LCD_CLEAR_LINE);
+    } 
+    else if(state == OPENEVSE_STATE_SLEEPING){
+        lcd_display("Scan RFID tag", 0, 0, 0, LCD_CLEAR_LINE);
+        lcd_display("to start", 0, 1, SCAN_FREQ, LCD_CLEAR_LINE);
+    }
+
     nextScan = millis() + SCAN_FREQ;
 
     boolean foundCard = nfc.scan();
@@ -138,43 +152,10 @@ void rfid_loop(){
     if(!foundCard && hasContact){
         hasContact = false;
     }
-
-    if(waitingForTag > 0){
-        waitingForTag = (stopWaiting - millis()) / 1000;
-        String msg = "tag... ";
-        msg.concat(waitingForTag);
-        lcd_display(msg, 0, 1, 1000, LCD_CLEAR_LINE);
-    }
 }
 
 uint8_t rfid_status(){
     return status;
-}
-
-DynamicJsonDocument rfid_get_stored_tags(){
-    // compute the required size
-    const size_t capacity = JSON_ARRAY_SIZE(3);
-
-    // allocate the memory for the document
-    DynamicJsonDocument doc(capacity);
-
-    // create an empty array
-    JsonArray array = doc.to<JsonArray>();
-
-    // add some values
-    array.add("hello");
-    array.add(42);
-    array.add(3.14);
-
-    return doc;
-}
-
-void rfid_store_tag(String uid){
-    uid.replace(" ", "");
-    uid.concat(",");
-    rfid_storage.concat(uid);
-    config_save_rfid(!config_rfid_enabled, rfid_storage); // A bit hacky and I'm not sure why it's needed
-    config_save_rfid(config_rfid_enabled, rfid_storage);
 }
 
 void rfid_wait_for_tag(uint8_t seconds){
