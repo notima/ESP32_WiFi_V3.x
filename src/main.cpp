@@ -69,6 +69,9 @@ static uint32_t last_mem = 0;
 
 static void hardware_setup();
 
+uint8_t sleep_timer = 60;
+static void sleep_timer_update();
+
 // -------------------------------------------------------------------
 // SETUP
 // -------------------------------------------------------------------
@@ -166,6 +169,9 @@ loop() {
       // -------------------------------------------------------------------
       if ((millis() - Timer3) >= 2000) {
         update_rapi_values();
+        if(config_rfid_enabled && state == OPENEVSE_STATE_NOT_CONNECTED){
+          sleep_timer_update();
+        }
         Timer3 = millis();
       }
 
@@ -278,4 +284,26 @@ void hardware_setup()
 #endif
 
   enableLoopWDT();
+}
+
+unsigned long goToSleep = 0;
+void sleep_timer_update(){
+  if(goToSleep == 0){
+    goToSleep = millis() + sleep_timer * 1000;
+  }
+  else if(millis() > goToSleep){
+    rapiSender.sendCmd(F("$FS"));
+    goToSleep = 0;
+  }
+  uint8_t messageToDisplay = millis() / 2000 % 4;
+  if(messageToDisplay == 0){
+    lcd_display("Connect your", 0, 0, 0, LCD_CLEAR_LINE);
+    lcd_display("vehicle", 0, 1, 2000, LCD_CLEAR_LINE);
+  }else if(messageToDisplay == 1){
+    lcd_display("Going to", 0, 0, 0, LCD_CLEAR_LINE);
+    String timerMsg = "sleep in: ";
+    timerMsg.concat((goToSleep - millis()) / 1000);
+    timerMsg.concat("s");
+    lcd_display(timerMsg, 0, 1, 2000, LCD_CLEAR_LINE);
+  }
 }
