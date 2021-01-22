@@ -41,6 +41,7 @@ extern String mqtt_solar;
 extern String mqtt_grid_ie;
 extern String mqtt_vrms;
 extern String mqtt_announce_topic;
+extern uint8_t mqtt_disconnect_current;
 
 // RFID storage
 extern String rfid_storage;

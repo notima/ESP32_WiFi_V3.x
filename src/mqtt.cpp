@@ -23,6 +23,8 @@ static long nextMqttReconnectAttempt = 0;
 static unsigned long mqttRestartTime = 0;
 static bool connecting = false;
 
+unsigned long checkCurrentAgain = 0;
+
 String lastWill = "";
 
 #ifndef MQTT_CONNECT_TIMEOUT
@@ -264,6 +266,23 @@ mqtt_loop() {
   }
 
   if (config_mqtt_enabled() && !mqttclient.connected()) {
+
+    // Set current to a safe level
+    if(millis() > checkCurrentAgain){
+      rapiSender.sendCmd("$GE", [](int ret){
+        checkCurrentAgain = millis() + 2000;
+        if(ret == RAPI_RESPONSE_OK){
+          String ampString = rapiSender.getToken(1);
+          uint8_t amp = ampString.toInt();
+          if(amp > mqtt_disconnect_current){
+            String command = "$SC ";
+            command.concat(mqtt_disconnect_current);
+            rapiSender.sendCmd(F(command.c_str()));
+          }
+        }
+      });
+    }
+
     long now = millis();
     // try and reconnect every x seconds
     if (now > nextMqttReconnectAttempt) {

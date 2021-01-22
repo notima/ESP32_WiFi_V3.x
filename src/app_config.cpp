@@ -45,6 +45,7 @@ String mqtt_solar;
 String mqtt_grid_ie;
 String mqtt_vrms;
 String mqtt_announce_topic;
+uint8_t mqtt_disconnect_current;
 
 // Time
 String time_zone;
@@ -108,6 +109,7 @@ ConfigOpt *opts[] =
   new ConfigOptDefenition<String>(mqtt_grid_ie, "emon/emonpi/power1", "mqtt_grid_ie", "mg"),
   new ConfigOptDefenition<String>(mqtt_vrms, "emon/emonpi/vrms", "mqtt_vrms", "mv"),
   new ConfigOptDefenition<String>(mqtt_announce_topic, "openevse/announce/"+ESPAL.getShortId(), "mqtt_announce_topic", "ma"),
+  new ConfigOptDefenition<uint8_t>(mqtt_disconnect_current, 7, "mqtt_disconnect_current", "mc"),
 
 // Ohm Connect Settings
   new ConfigOptDefenition<String>(ohm, "", "ohm", "o"),
