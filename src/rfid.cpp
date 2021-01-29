@@ -148,7 +148,7 @@ void rfid_loop(){
 
     nextScan = millis() + SCAN_FREQ;
 
-    boolean foundCard = nfc.scan();
+    boolean foundCard = (state == OPENEVSE_STATE_SLEEPING || waitingForTag) && nfc.scan();
 
     if(foundCard && !hasContact){
         scanCard();
@@ -218,7 +218,7 @@ void sleep_timer_update(){
         timerMsg.concat((goToSleep - millis()) / 1000);
         timerMsg.concat("s");
         lcd_display(timerMsg, 0, 1, 2000, LCD_CLEAR_LINE);
-    }else if(messageToDisplay == 0 && OPENEVSE_STATE_SLEEPING){
+    }else if(messageToDisplay == 0 && state == OPENEVSE_STATE_SLEEPING){
         lcd_display("Scan RFID tag", 0, 0, 0, LCD_CLEAR_LINE);
         lcd_display("to start", 0, 1, 4000, LCD_CLEAR_LINE);
     }
