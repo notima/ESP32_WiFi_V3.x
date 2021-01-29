@@ -274,9 +274,9 @@ mqtt_loop() {
         if(ret == RAPI_RESPONSE_OK){
           String ampString = rapiSender.getToken(1);
           uint8_t amp = ampString.toInt();
-          if(amp > mqtt_disconnect_current){
+          if(amp > safe_current_level){
             String command = "$SC ";
-            command.concat(mqtt_disconnect_current);
+            command.concat(safe_current_level);
             rapiSender.sendCmd(F(command.c_str()));
           }
         }
