@@ -11,6 +11,7 @@
 #include "RapiSender.h"
 #include "input.h"
 #include "openevse.h"
+#include "load_balancer.h"
 
 DFRobot_PN532_IIC  nfc(PN532_IRQ, PN532_POLLING); 
 struct card NFCcard;
@@ -52,6 +53,8 @@ void rfid_setup(){
         config_save_rfid(false, rfid_storage);
         status = STATUS_NOT_FOUND;
     }
+
+    nextSleepTimerTick = millis() + 30000;
 }
 
 String getUidHex(card NFCcard){
@@ -104,7 +107,11 @@ void scanCard(){
             storedTagStr.trim();
             uidHex.trim();
             if(storedTagStr.compareTo(uidHex) == 0){
-                rapiSender.sendCmd(F("$FE"));
+                lcd_release();
+                if(config_load_balancing_enabled)
+                    safe_wakeup();
+                else
+                    rapiSender.sendCmd(F("$FE"));
                 break;
             }
             storedTag = strtok(NULL, ",");
@@ -168,6 +175,7 @@ uint8_t rfid_status(){
 void rfid_wait_for_tag(uint8_t seconds){
     if(!config_rfid_enabled())
         return;
+    lcd_release();
     waitingForTag = seconds;
     stopWaiting = millis() + seconds * 1000;
     cardFound = false;
@@ -215,11 +223,15 @@ void sleep_timer_update(){
     }else if(messageToDisplay == 1 && state == OPENEVSE_STATE_NOT_CONNECTED){
         lcd_display("Going to", 0, 0, 0, LCD_CLEAR_LINE);
         String timerMsg = "sleep in: ";
-        timerMsg.concat((goToSleep - millis()) / 1000);
+        int timeLeft = (goToSleep - millis()) / 1000;
+        timerMsg.concat(timeLeft <= 60 && timeLeft >= 0 ? timeLeft : 0);
         timerMsg.concat("s");
         lcd_display(timerMsg, 0, 1, 2000, LCD_CLEAR_LINE);
     }else if(messageToDisplay == 0 && state == OPENEVSE_STATE_SLEEPING){
         lcd_display("Scan RFID tag", 0, 0, 0, LCD_CLEAR_LINE);
         lcd_display("to start", 0, 1, 4000, LCD_CLEAR_LINE);
+    }else{
+        if(state == OPENEVSE_STATE_SLEEPING)
+            lcd_release();
     }
 }
