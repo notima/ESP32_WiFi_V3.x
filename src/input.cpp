@@ -14,6 +14,7 @@
 #include "net_manager.h"
 #include "openevse.h"
 #include "espal.h"
+#include "lcd.h"
 
 #include "LedManagerTask.h"
 
@@ -310,6 +311,8 @@ void input_setup()
 
   OpenEVSE.onState([](uint8_t evse_state, uint8_t pilot_state, uint32_t current_capacity, uint32_t vflags)
   {
+    lcd_release();
+    
     // Go to sleep if disconnected when RFID is enabled
     if(state < OPENEVSE_STATE_SLEEPING && evse_state == OPENEVSE_STATE_NOT_CONNECTED && config_rfid_enabled){
       rapiSender.sendCmd(F("$FS"));
