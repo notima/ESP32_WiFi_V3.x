@@ -143,3 +143,14 @@ void lcd_loop()
   }
 }
 
+void lcd_release() {
+  for(Message *next, *node = head; node; node = next) {
+    next = node->next;
+    delete node;
+  }
+  head = NULL;
+  tail = NULL;
+  rapiSender.sendCmd(F("$F0 1"));
+  lcdClaimed = false;
+}
+

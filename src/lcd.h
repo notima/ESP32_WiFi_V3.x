@@ -11,4 +11,9 @@ void lcd_display(String &msg, int x, int y, int time, uint32_t flags);
 void lcd_display(const char *msg, int x, int y, int time, uint32_t flags);
 void lcd_loop();
 
+// -------------------------------------------------------------------
+// Clear the message queue and enable display updates
+// -------------------------------------------------------------------
+void lcd_release();
+
 #endif // __LCD_H
