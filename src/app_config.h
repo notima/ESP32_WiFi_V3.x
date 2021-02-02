@@ -45,7 +45,7 @@ extern String mqtt_announce_topic;
 // Load Balancing settings
 extern uint8_t safe_current_level;
 extern uint8_t total_current;
-extern String loadBalancingTopics;
+extern String load_balancing_topics;
 
 // RFID storage
 extern String rfid_storage;
