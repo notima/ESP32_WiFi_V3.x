@@ -9,6 +9,7 @@
 #include "input.h"
 #include "espal.h"
 #include "net_manager.h"
+#include "load_balancer.h"
 
 #include "openevse.h"
 
@@ -40,8 +41,8 @@ String lastWill = "";
 void mqttmsg_callback(MongooseString topic, MongooseString payload) {
 
   String topic_string = topic.toString();
-  // print received MQTT to debug
 
+  // print received MQTT to debug
   DBUGLN("MQTT received:");
   DBUGLN("Topic: " + topic_string);
 
@@ -77,6 +78,9 @@ void mqttmsg_callback(MongooseString topic, MongooseString payload) {
     if ((newdivert==1) || (newdivert==2)){
       divertmode_update(newdivert);
     }
+  }
+  else if (topic_string.substring(0, mqtt_topic.length()) != mqtt_topic){
+    load_balance_rapi_result(topic_string.substring(0, mqtt_topic.length()), payload);
   }
   else
   {
@@ -190,6 +194,12 @@ mqtt_connect()
     mqtt_sub_topic = mqtt_topic + "/divertmode/set";      // MQTT Topic to change divert mode
     mqttclient.subscribe(mqtt_sub_topic);
 
+    if(config_load_balancing_enabled()){
+      // MQTT Topic to subscribe to receive RAPI results from balanced devices
+      String balancing_topic = load_balancing_topics + "/rapi/out/#";
+      mqttclient.subscribe(balancing_topic); 
+    }
+
     connecting = false;
   });
 
@@ -243,6 +253,14 @@ mqtt_publish(JsonDocument &data) {
   }
 
   Profile_End(mqtt_publish, 5);
+}
+
+// -------------------------------------------------------------------
+// Publish a value to any topic
+// -------------------------------------------------------------------
+void 
+mqtt_publish(String topic, String value){
+    mqttclient.publish(topic, value);
 }
 
 // -------------------------------------------------------------------

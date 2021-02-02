@@ -30,6 +30,8 @@ extern void mqtt_loop();
 // -------------------------------------------------------------------
 extern void mqtt_publish(JsonDocument &data);
 
+extern void mqtt_publish(String topic, String value);
+
 // -------------------------------------------------------------------
 // Restart the MQTT connection
 // -------------------------------------------------------------------
