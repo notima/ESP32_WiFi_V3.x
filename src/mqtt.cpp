@@ -7,6 +7,7 @@
 #include "app_config.h"
 #include "divert.h"
 #include "input.h"
+#include "time_man.h"
 #include "espal.h"
 #include "net_manager.h"
 #include "load_balancer.h"
@@ -206,30 +207,44 @@ mqtt_connect()
   return true;
 }
 
-std::queue<String> logQueue;
-
-void
-mqtt_log(String msg) {
+std::queue<std::array<String, 2>> logQueue;
+void 
+mqtt_log(String logLevel, String msg) {
   if(!config_mqtt_enabled()) {
     return;
   }
 
+  char buffer[1000];
+  sprintf(buffer, "%s | %s", time_format_time(time(NULL)).c_str(), msg.c_str());
+
   if(!mqttclient.connected()) {
-    logQueue.push(msg);
+    logQueue.push({logLevel, buffer});
     if(logQueue.size() > 100){
       logQueue.pop();
     }
     return;
   }
 
-  String topic = mqtt_topic + "/log";
+  String topic = mqtt_topic;
+  topic.concat("/log/");
+  topic.concat(logLevel);
 
   while(!logQueue.empty()){
-    mqttclient.publish(topic, logQueue.front());
+    mqttclient.publish(logQueue.front()[0], logQueue.front()[1]);
     logQueue.pop();
   }
 
-  mqttclient.publish(topic, msg);
+  mqttclient.publish(topic, buffer);
+}
+
+void
+mqtt_log(String msg) {
+  mqtt_log("info", msg);
+}
+
+void
+mqtt_log_error(String msg) {
+  mqtt_log("error", msg);
 }
 
 // -------------------------------------------------------------------

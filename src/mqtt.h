@@ -14,6 +14,7 @@
 #define MQTT_PROTOCOL_WEBSOCKET_SSL 3
 
 extern void mqtt_log(String msg);
+extern void mqtt_log_error(String msg);
 
 extern void mqtt_msg_callback();
 
