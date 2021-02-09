@@ -27,6 +27,8 @@ static bool connecting = false;
 
 unsigned long checkCurrentAgain = 0;
 
+std::queue<std::array<String, 2>> logQueue;
+
 String lastWill = "";
 
 #ifndef MQTT_CONNECT_TIMEOUT
@@ -207,7 +209,6 @@ mqtt_connect()
   return true;
 }
 
-std::queue<std::array<String, 2>> logQueue;
 void 
 mqtt_log(String logLevel, String msg) {
   if(!config_mqtt_enabled()) {
@@ -218,7 +219,8 @@ mqtt_log(String logLevel, String msg) {
   sprintf(buffer, "%s | %s", time_format_time(time(NULL)).c_str(), msg.c_str());
 
   if(!mqttclient.connected()) {
-    logQueue.push({logLevel, buffer});
+    String msg = buffer;
+    logQueue.push({logLevel, msg});
     if(logQueue.size() > 100){
       logQueue.pop();
     }
@@ -228,11 +230,6 @@ mqtt_log(String logLevel, String msg) {
   String topic = mqtt_topic;
   topic.concat("/log/");
   topic.concat(logLevel);
-
-  while(!logQueue.empty()){
-    mqttclient.publish(logQueue.front()[0], logQueue.front()[1]);
-    logQueue.pop();
-  }
 
   mqttclient.publish(topic, buffer);
 }
@@ -321,6 +318,16 @@ mqtt_loop() {
     if (now > nextMqttReconnectAttempt) {
       nextMqttReconnectAttempt = now + MQTT_CONNECT_TIMEOUT;
       mqtt_connect(); // Attempt to reconnect
+    }
+  }
+
+  if(config_mqtt_enabled() && mqttclient.connected()){
+    while(!logQueue.empty()){
+      String topic = mqtt_topic;
+      topic.concat("/log/");
+      topic.concat(logQueue.front()[0]);
+      mqttclient.publish(topic.c_str(), logQueue.front()[1].c_str());
+      logQueue.pop();
     }
   }
 
