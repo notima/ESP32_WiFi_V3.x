@@ -39,8 +39,13 @@ void rfid_setup(){
     if(nfc.begin()){
         status = STATUS_ACTIVE;
     }else{
-        mqtt_log_error("RFID module did not respond!");
-        status = STATUS_NOT_FOUND;
+        if(status == STATUS_NOT_FOUND){
+            config_save_rfid(false, rfid_storage);
+            mqtt_log_error("RFID still not responding and has been disabled.");
+        }else{
+            mqtt_log_error("RFID module did not respond!");
+            status = STATUS_NOT_FOUND;
+        }
     }
 }
 
