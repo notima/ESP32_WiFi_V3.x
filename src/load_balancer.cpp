@@ -5,6 +5,7 @@
 #include "openevse.h"
 #include "mqtt.h"
 #include "lcd.h"
+#include "sleep_timer.h"
 
 #include <functional>
 
@@ -79,6 +80,7 @@ void load_balancing_loop(){
             char msg[50];
             sprintf(msg, "Safety check timed out! %s might be offline.", load_balancing_topics);
             mqtt_log_error(msg);
+            sleep_timer_display_updates(true);
         }
     }else{
         if(state == OPENEVSE_STATE_DISABLED){
@@ -100,6 +102,7 @@ void load_balancing_loop(){
 }
 
 void safe_wakeup(){
+    sleep_timer_display_updates(false);
     waking_up = true;
     DEBUG.println("Waking up");
     wakeupStarted = millis() + MQTT_TIMEOUT;
@@ -108,6 +111,7 @@ void safe_wakeup(){
         String currentStr = "";
         currentStr.concat(safe_current_level);
         sendCommand(load_balancing_topics + RAPI_SET_CURRENT, currentStr, [](String result){
+            sleep_timer_display_updates(true);
             rapiSender.sendCmd(F("$FE"));
             waking_up = false;
         });

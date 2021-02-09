@@ -12,6 +12,7 @@
 #include "input.h"
 #include "openevse.h"
 #include "load_balancer.h"
+#include "sleep_timer.h"
 
 DFRobot_PN532_IIC  nfc(PN532_IRQ, PN532_POLLING); 
 struct card NFCcard;
@@ -21,10 +22,6 @@ uint8_t status = STATUS_NOT_ENABLED;
 boolean hasContact = false;
 
 unsigned long nextScan = 0;
-unsigned long nextSleepTimerTick = 0;
-
-uint8_t sleep_timer = 60;
-static void sleep_timer_update();
 
 // How many more seconds to wait for tag
 uint8_t waitingForTag = 0;
@@ -53,8 +50,6 @@ void rfid_setup(){
         config_save_rfid(false, rfid_storage);
         status = STATUS_NOT_FOUND;
     }
-
-    nextSleepTimerTick = millis() + 30000;
 }
 
 String getUidHex(card NFCcard){
@@ -96,6 +91,7 @@ void scanCard(){
         cardFound = true;
         lcd_display("Tag detected!", 0, 0, 0, LCD_CLEAR_LINE);
         lcd_display(uidHex, 0, 1, 3000, LCD_CLEAR_LINE);
+        sleep_timer_display_updates(true);
     }else{
         // Check if tag is stored locally
         char storedTags[rfid_storage.length() + 1];
@@ -131,11 +127,6 @@ void rfid_loop(){
         return;
     }
 
-    if(millis() > nextSleepTimerTick && waitingForTag == 0){
-        sleep_timer_update();
-        nextSleepTimerTick = millis() + 2000;
-    }
-
     if(millis() < nextScan){
         return;
     }
@@ -151,6 +142,8 @@ void rfid_loop(){
         msg.concat(waitingForTag);
         lcd_display("Waiting for RFID", 0, 0, 0, LCD_CLEAR_LINE);
         lcd_display(msg, 0, 1, 1000, LCD_CLEAR_LINE);
+        if(waitingForTag < 1)
+            sleep_timer_display_updates(true);
     }
 
     nextScan = millis() + SCAN_FREQ;
@@ -175,6 +168,7 @@ uint8_t rfid_status(){
 void rfid_wait_for_tag(uint8_t seconds){
     if(!config_rfid_enabled())
         return;
+    sleep_timer_display_updates(false);
     lcd_release();
     waitingForTag = seconds;
     stopWaiting = millis() + seconds * 1000;
@@ -200,38 +194,4 @@ DynamicJsonDocument rfid_poll() {
         doc["status"] = "notStarted";
     }
     return doc;
-}
-
-unsigned long goToSleep = 0;
-void sleep_timer_update(){
-    if(state == OPENEVSE_STATE_NOT_CONNECTED){
-        if(goToSleep == 0){
-            goToSleep = millis() + sleep_timer * 1000;
-        }
-        else if(millis() > goToSleep){
-            rapiSender.sendCmd(F("$FS"));
-            goToSleep = 0;
-        }
-    } else {
-        goToSleep = 0;
-    }
-
-    uint8_t messageToDisplay = millis() / 2000 % 4;
-    if(messageToDisplay == 0 && state == OPENEVSE_STATE_NOT_CONNECTED){
-        lcd_display("Connect your", 0, 0, 0, LCD_CLEAR_LINE);
-        lcd_display("vehicle", 0, 1, 2000, LCD_CLEAR_LINE);
-    }else if(messageToDisplay == 1 && state == OPENEVSE_STATE_NOT_CONNECTED){
-        lcd_display("Going to", 0, 0, 0, LCD_CLEAR_LINE);
-        String timerMsg = "sleep in: ";
-        int timeLeft = (goToSleep - millis()) / 1000;
-        timerMsg.concat(timeLeft <= 60 && timeLeft >= 0 ? timeLeft : 0);
-        timerMsg.concat("s");
-        lcd_display(timerMsg, 0, 1, 2000, LCD_CLEAR_LINE);
-    }else if(messageToDisplay == 0 && state == OPENEVSE_STATE_SLEEPING){
-        lcd_display("Scan RFID tag", 0, 0, 0, LCD_CLEAR_LINE);
-        lcd_display("to start", 0, 1, 4000, LCD_CLEAR_LINE);
-    }else{
-        if(state == OPENEVSE_STATE_SLEEPING)
-            lcd_release();
-    }
 }

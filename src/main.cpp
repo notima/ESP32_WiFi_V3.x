@@ -56,6 +56,7 @@
 
 #include "rfid.h"
 #include "load_balancer.h"
+#include "sleep_timer.h"
 
 RapiSender rapiSender(&RAPI_PORT);
 
@@ -148,6 +149,9 @@ loop() {
   time_loop();
   rfid_loop();
   load_balancing_loop();
+  if(config_rfid_enabled())
+    sleep_timer_loop();
+
   MicroTask.update();
 
   if(OpenEVSE.isConnected())
