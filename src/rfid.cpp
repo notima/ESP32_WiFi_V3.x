@@ -32,22 +32,14 @@ boolean cardFound = false;
 
 void rfid_setup(){
     if(!config_rfid_enabled()){
-        DEBUG.println("RFID disabled");
         status = STATUS_NOT_ENABLED;
         return;
     }
-    DEBUG.println("RFID enabled");
-
-    lcd_display("RFID status:", 0, 0, 0, LCD_CLEAR_LINE);
 
     if(nfc.begin()){
-        DEBUG.println("RFID module initialized");
-        lcd_display("connected", 0, 1, 3000, LCD_CLEAR_LINE);
         status = STATUS_ACTIVE;
     }else{
-        DEBUG.println("RFID module not found");
-        lcd_display("not found", 0, 1, 3000, LCD_CLEAR_LINE);
-        config_save_rfid(false, rfid_storage);
+        mqtt_log_error("RFID module did not respond!");
         status = STATUS_NOT_FOUND;
     }
 }
