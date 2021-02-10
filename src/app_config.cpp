@@ -51,6 +51,12 @@ uint8_t safe_current_level;
 uint8_t total_current;
 String load_balancing_topics;
 
+// Sleep timer
+uint8_t sleep_timer_enabled_flags;
+uint16_t sleep_timer_not_connected;
+uint16_t sleep_timer_connected;
+uint16_t sleep_timer_disconnected;
+
 // Time
 String time_zone;
 
@@ -115,9 +121,9 @@ ConfigOpt *opts[] =
   new ConfigOptDefenition<String>(mqtt_announce_topic, "openevse/announce/"+ESPAL.getShortId(), "mqtt_announce_topic", "ma"),
 
 // Load Balancing settings
-  new ConfigOptDefenition<uint8_t>(safe_current_level, 7, "safe_current_level", "sc"),
-  new ConfigOptDefenition<uint8_t>(total_current, 7, "total_current", "tc"),
-  new ConfigOptDefenition<String>(load_balancing_topics, "", "load_balancing_topics", "lt"),
+  new ConfigOptDefenition<uint8_t>(safe_current_level, 7, "safe_current_level", "bs"),
+  new ConfigOptDefenition<uint8_t>(total_current, 7, "total_current", "bc"),
+  new ConfigOptDefenition<String>(load_balancing_topics, "", "load_balancing_topics", "bt"),
 
 // Ohm Connect Settings
   new ConfigOptDefenition<String>(ohm, "", "ohm", "o"),
@@ -135,6 +141,12 @@ ConfigOpt *opts[] =
 
 // RFID storage
   new ConfigOptDefenition<String>(rfid_storage, "", "rfid_storage", "rs"),
+
+//Sleep timer
+  new ConfigOptDefenition<uint8_t>(sleep_timer_enabled_flags, 0, "sleep_timer_enabled_flags", "st"),
+  new ConfigOptDefenition<uint16_t>(sleep_timer_not_connected, 0, "sleep_timer_not_connected", "tn"),
+  new ConfigOptDefenition<uint16_t>(sleep_timer_connected, 0, "sleep_timer_connected", "tc"),
+  new ConfigOptDefenition<uint16_t>(sleep_timer_disconnected, 0, "sleep_timer_disconnected", "td"),
 
 // Flags
   &flagsOpt,

@@ -50,6 +50,12 @@ extern String load_balancing_topics;
 // RFID storage
 extern String rfid_storage;
 
+// Sleep timer
+extern uint8_t sleep_timer_enabled_flags;
+extern uint16_t sleep_timer_not_connected;
+extern uint16_t sleep_timer_connected;
+extern uint16_t sleep_timer_disconnected;
+
 // Time
 extern String time_zone;
 

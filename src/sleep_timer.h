@@ -3,12 +3,9 @@
 #define SLEEP_TIMER_H
 #include <ArduinoJson.h>
 
-// Time before going to sleep after waking up and no vehicle is connected
-#define SLEEP_TIMER_NOT_CONNECTED (1 * 60 * 1000)
-// Time before going to sleep after a vehicle is connected
-#define SLEEP_TIMER_CONNECTED (5 * 60 * 1000)
-// Time before going to sleep after a vehicle is disconnected
-#define SLEEP_TIMER_DISCONNECTED (10 * 1000)
+#define SLEEP_TIMER_NOT_CONNECTED_FLAG (1 << 0)
+#define SLEEP_TIMER_CONNECTED_FLAG (1 << 1)
+#define SLEEP_TIMER_DISCONNECTED_FLAG (1 << 2)
 
 
 extern void sleep_timer_loop();

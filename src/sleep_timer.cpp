@@ -1,6 +1,7 @@
 #include "sleep_timer.h"
 #include "input.h"
 #include "lcd.h"
+#include "app_config.h"
 #include <openevse.h>
 
 unsigned long nextTimerTick = 0;
@@ -58,18 +59,24 @@ void sleep_timer_loop(){
 }
 
 void on_wake_up(){
-    goToSleep = millis() + SLEEP_TIMER_NOT_CONNECTED;
-    counting = true;
+    if((sleep_timer_enabled_flags & SLEEP_TIMER_NOT_CONNECTED_FLAG) == SLEEP_TIMER_NOT_CONNECTED_FLAG){
+        goToSleep = millis() + sleep_timer_not_connected * 1000;
+        counting = true;
+    }
 }
 
 void on_vehicle_connected(){
-    goToSleep = millis() + SLEEP_TIMER_CONNECTED;
-    counting = true;
+    if((sleep_timer_enabled_flags & SLEEP_TIMER_CONNECTED_FLAG) == SLEEP_TIMER_CONNECTED_FLAG){
+        goToSleep = millis() + sleep_timer_connected * 1000;
+        counting = true;
+    }
 }
 
 void on_vehicle_disconnected(){
-    goToSleep = millis() + SLEEP_TIMER_DISCONNECTED;
-    counting = true;
+    if((sleep_timer_enabled_flags & SLEEP_TIMER_DISCONNECTED_FLAG) == SLEEP_TIMER_DISCONNECTED_FLAG){
+        goToSleep = millis() + sleep_timer_disconnected * 1000;
+        counting = true;
+    }
 }
 
 void sleep_timer_display_updates(bool enabled){
