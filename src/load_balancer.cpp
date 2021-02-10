@@ -23,6 +23,7 @@ unsigned long wakeupStarted = 0;
 
 std::function<void(String)> rapi_callback = [](String result){};
 bool waking_up = false;
+bool timed_out = false;
 
 String lastCommand = "";
 
@@ -51,7 +52,7 @@ String getToken(String string, int index){
 void safetyCheck(std::function<void()> onSafe){
     sendCommand(load_balancing_topics + RAPI_GET_STATE, "", [onSafe](String result){
         uint8_t state = atoi(getToken(result, 1).c_str());
-        if(state == OPENEVSE_STATE_SLEEPING){
+        if(state >= OPENEVSE_STATE_SLEEPING){
             setCurrent(total_current);
             onSafe();
         }else{
@@ -70,11 +71,11 @@ void load_balancing_loop(){
         if(wakeupStarted - millis() < MQTT_TIMEOUT){
             lcd_display("Please wait...", 0, 0, 0, LCD_CLEAR_LINE);
             lcd_display("", 0, 1, 1000, LCD_CLEAR_LINE);
-            rapiSender.sendCmd(F("$FB 7"));
+            rapiSender.sendCmd(F("$FB 6"));
             nextTick = millis() + WAKING_TICK_RATE;
         }else{
             waking_up = false;
-            rapiSender.sendCmd(F("$FD"));
+            timed_out = true;
             msgRoll = 0;
             DEBUG.println("safety check timed out.");
             char msg[50];
@@ -83,16 +84,19 @@ void load_balancing_loop(){
             sleep_timer_display_updates(true);
         }
     }else{
-        if(state == OPENEVSE_STATE_DISABLED){
+        if(timed_out){
+            sleep_timer_display_updates(false);
             safetyCheck([](){
-                rapiSender.sendCmd(F("$FS"));
+                timed_out = false;
+            sleep_timer_display_updates(true);
             });
             rapiSender.sendCmd(F("$FB 1"));
             lcd_display("Out of order", 0, 0, 0, LCD_CLEAR_LINE);
             for(uint8_t i = 0; i < IDLE_TICK_RATE / 500; i++)
                 lcd_display(MQTT_TIMEOUT_MSG + (msgRoll++ % strlen(MQTT_TIMEOUT_MSG)), 0, 1, 500, LCD_CLEAR_LINE);
             if(msgRoll >= strlen(MQTT_TIMEOUT_MSG) * 2){
-                rapiSender.sendCmd(F("$FS 1"));
+                timed_out = false;
+                sleep_timer_display_updates(true);
             }
         }else{
             safetyCheck([](){});

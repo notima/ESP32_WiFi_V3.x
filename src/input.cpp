@@ -315,7 +315,7 @@ void input_setup()
     lcd_release();
     
     // When waking up
-    if(state == OPENEVSE_STATE_SLEEPING && evse_state == OPENEVSE_STATE_NOT_CONNECTED && config_rfid_enabled){
+    if(state >= OPENEVSE_STATE_SLEEPING && evse_state == OPENEVSE_STATE_NOT_CONNECTED && config_rfid_enabled){
       on_wake_up();
     }
     else if(evse_state == OPENEVSE_STATE_CONNECTED){

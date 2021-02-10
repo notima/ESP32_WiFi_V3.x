@@ -145,7 +145,7 @@ void rfid_loop(){
 
     nextScan = millis() + SCAN_FREQ;
 
-    boolean foundCard = (state == OPENEVSE_STATE_SLEEPING || waitingForTag) && nfc.scan();
+    boolean foundCard = (state >= OPENEVSE_STATE_SLEEPING || waitingForTag) && nfc.scan();
 
     if(foundCard && !hasContact){
         scanCard();

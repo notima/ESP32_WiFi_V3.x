@@ -34,7 +34,7 @@ void updateDisplay(){
         int timeLeft = (goToSleep - millis()) / 1000;
         timerMsg.concat(createTimeString(timeLeft));
         lcd_display(timerMsg, 0, 1, 1100, LCD_CLEAR_LINE);
-    }else if(messageToDisplay == 0 && state == OPENEVSE_STATE_SLEEPING){
+    }else if(messageToDisplay == 0 && state >= OPENEVSE_STATE_SLEEPING){
         lcd_display("Scan RFID tag", 0, 0, 0, LCD_CLEAR_LINE);
         lcd_display("to start", 0, 1, 1100, LCD_CLEAR_LINE);
     }
@@ -48,7 +48,7 @@ void sleep_timer_loop(){
 
     if(counting){
         if(millis() > goToSleep){
-            rapiSender.sendCmd(F("$FS"));
+            rapiSender.sendCmd(config_pause_uses_disabled() ? F("$FD") : F("$FS"));
             counting = false;
         }
     }
