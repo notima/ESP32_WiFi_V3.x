@@ -48,6 +48,8 @@ void sleep_timer_loop(){
 
     if(counting){
         if(millis() > goToSleep){
+            // Simulate a button press in case there is a timer active
+            rapiSender.sendCmd(F("$F1"));
             rapiSender.sendCmd(config_pause_uses_disabled() ? F("$FD") : F("$FS"));
             counting = false;
         }

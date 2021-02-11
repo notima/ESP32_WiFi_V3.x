@@ -49,14 +49,13 @@
 #include "time_man.h"
 #include "tesla_client.h"
 #include "event.h"
+#include "rfid.h"
+#include "sleep_timer.h"
+#include "load_balancer.h"
 
 #include "LedManagerTask.h"
 
 #include "RapiSender.h"
-
-#include "rfid.h"
-#include "load_balancer.h"
-#include "sleep_timer.h"
 
 RapiSender rapiSender(&RAPI_PORT);
 
@@ -120,6 +119,7 @@ void setup()
 #endif
 
   input_setup();
+  rfid_setup();
 
   lcd_display(F("OpenEVSE WiFI"), 0, 0, 0, LCD_CLEAR_LINE);
   lcd_display(currentfirmware, 0, 1, 5 * 1000, LCD_CLEAR_LINE);

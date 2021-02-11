@@ -11,8 +11,17 @@
 #include "RapiSender.h"
 #include "input.h"
 #include "openevse.h"
-#include "load_balancer.h"
 #include "sleep_timer.h"
+#include "Wire.h"
+#include "load_balancer.h"
+
+#ifndef I2C_SDA
+#define I2C_SDA 21
+#endif
+
+#ifndef I2C_SCL
+#define I2C_SCL 22
+#endif
 
 DFRobot_PN532_IIC  nfc(PN532_IRQ, PN532_POLLING); 
 struct card NFCcard;
@@ -36,6 +45,7 @@ void rfid_setup(){
         return;
     }
 
+    Wire.begin(I2C_SDA, I2C_SCL);
     if(nfc.begin()){
         status = STATUS_ACTIVE;
     }else{
