@@ -17,12 +17,13 @@
 #define I2C_SCL 22
 #endif
 
+DFRobot_PN532_IIC nfc(PN532_IRQ, PN532_POLLING); 
+
 RfidTask::RfidTask() :
   MicroTasks::Task(),
   _evse(NULL),
   _scheduler(NULL),
-  _evseStateEvent(this),
-  nfc(PN532_IRQ, PN532_POLLING)
+  _evseStateEvent(this)
 {
 }
 
@@ -53,26 +54,14 @@ void RfidTask::setup(){
     }
 }
 
-String RfidTask::getUidHex(card NFCcard){
-    String uidHex = "";
-    for(int i = 0; i < NFCcard.uidlenght; i++){
-        char hex[NFCcard.uidlenght * 3];
-        sprintf(hex,"%x",NFCcard.uid[i]);
-        uidHex = uidHex + hex + " ";
-    }
-    uidHex.trim();
-    return uidHex;
-}
-
-void RfidTask::scanCard(){
-    NFCcard = nfc.getInformation();
-    String uidHex = getUidHex(NFCcard);
+void RfidTask::verifyUID(String uid){
+    Serial.printf("\n%s\n", uid.c_str());
 
     if(waitingForTag > 0){
         waitingForTag = 0;
         cardFound = true;
         lcd.display("Tag detected!", 0, 0, 0, LCD_CLEAR_LINE);
-        lcd.display(uidHex, 0, 1, 3000, LCD_CLEAR_LINE);
+        lcd.display(uid, 0, 1, 3000, LCD_CLEAR_LINE);
     }else{
         // Check if tag is stored locally
         char storedTags[rfid_storage.length() + 1];
@@ -82,9 +71,10 @@ void RfidTask::scanCard(){
         {
             String storedTagStr = storedTag;
             storedTagStr.trim();
-            uidHex.trim();
-            if(storedTagStr.compareTo(uidHex) == 0){
+            uid.trim();
+            if(storedTagStr.compareTo(uid) == 0){
                 rapiSender.sendCmd(F("$FE"));
+                //schedulePause();
                 break;
             }
             storedTag = strtok(NULL, ",");
@@ -92,8 +82,10 @@ void RfidTask::scanCard(){
 
         // Send to MQTT broker
         DynamicJsonDocument data(4096);
-        data["rfid"] = uidHex;
+        data["rfid"] = uid;
         mqtt_publish(data);
+                rapiSender.sendCmd(F("$FE"));
+                schedulePause();
     }
 }
 
@@ -119,10 +111,14 @@ unsigned long RfidTask::loop(MicroTasks::WakeReason reason){
         lcd.display(msg, 0, 1, 1000, LCD_CLEAR_LINE);
     }
 
-    boolean foundCard = (state >= OPENEVSE_STATE_SLEEPING || waitingForTag) && nfc.scan();
+    boolean foundCard = false;
+    if((state >= OPENEVSE_STATE_SLEEPING || waitingForTag)){
+        nfc.begin();
+        foundCard = nfc.scan();
+    }
 
     if(foundCard && !hasContact){
-        scanCard();
+        verifyUID(nfc.readUid());
         hasContact = true;
         return nextScan;
     }
@@ -132,6 +128,10 @@ unsigned long RfidTask::loop(MicroTasks::WakeReason reason){
     }
 
     return nextScan;
+}
+
+void RfidTask::schedulePause(){
+    //_scheduler->addEvent((uint32_t)100, 11, 27, 00, SCHEDULER_DAY_TUESDAY, EvseState(EvseState::Disabled));
 }
 
 uint8_t RfidTask::getStatus(){
@@ -158,7 +158,7 @@ DynamicJsonDocument RfidTask::rfidPoll() {
     else if(cardFound){
         // respond with the scanned tags uid and reset
         doc["status"] = "done";
-        doc["scanned"] = getUidHex(NFCcard);
+        doc["scanned"] = nfc.readUid();
         cardFound = false;
     }
     else  {

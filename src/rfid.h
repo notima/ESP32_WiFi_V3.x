@@ -5,7 +5,7 @@
 #include "evse_man.h"
 #include "scheduler.h"
 
-#define  SCAN_FREQ            200
+#define  SCAN_FREQ            1000
 #define  RFID_BLOCK_SIZE      16
 #define  PN532_IRQ            (2)
 #define  PN532_INTERRUPT      (1)
@@ -20,7 +20,6 @@ class RfidTask : public MicroTasks::Task {
         EvseManager *_evse;
         Scheduler *_scheduler;
         MicroTasks::EventListener _evseStateEvent;
-        DFRobot_PN532_IIC nfc; 
         uint8_t status = RFID_STATUS_NOT_ENABLED;
         boolean hasContact = false;
         uint8_t waitingForTag = 0;
@@ -31,8 +30,10 @@ class RfidTask : public MicroTasks::Task {
         void setup();
         unsigned long loop(MicroTasks::WakeReason reason);
         struct card NFCcard;
-        String getUidHex(card NFCcard);
-        void scanCard();
+        void verifyUID(String uid);
+        void checkState();
+        void schedulePause();
+        void abortSchedule();
 
     public:
         RfidTask();

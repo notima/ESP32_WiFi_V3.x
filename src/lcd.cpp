@@ -3,7 +3,7 @@
 #include "RapiSender.h"
 #include "openevse.h"
 #include "input.h"
-#include <time.h>
+#include <sys/time.h>
 
 static void IGNORE(int ret) {
 }
