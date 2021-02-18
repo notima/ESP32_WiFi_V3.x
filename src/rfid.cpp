@@ -4,7 +4,6 @@
 #include "mqtt.h"
 #include "lcd.h"
 #include "app_config.h"
-#include "RapiSender.h"
 #include "input.h"
 #include "openevse.h"
 #include "load_balancer.h"
@@ -71,9 +70,8 @@ void RfidTask::scanCard(){
                 if(config_load_balancing_enabled){
                     safe_wakeup();
                 }else{
-                    rapiSender.sendCmd(F("$FE"));
+                    _evse->getOpenEVSE().enable([](int ret){});
                 }
-                break;
             }
             storedTag = strtok(NULL, ",");
         }
