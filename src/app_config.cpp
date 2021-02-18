@@ -5,6 +5,7 @@
 #include "tesla_client.h"
 #include "emoncms.h"
 #include "input.h"
+#include "LedManagerTask.h"
 
 #include "app_config.h"
 #include "app_config_mqtt.h"
@@ -79,6 +80,9 @@ int tesla_vehidx;
 
 // RFID storage
 String rfid_storage;
+#if RGB_LED
+uint8_t led_brightness;
+#endif
 
 String esp_hostname_default = "openevse-"+ESPAL.getShortId();
 
@@ -86,7 +90,7 @@ void config_changed(String name);
 
 ConfigOptDefenition<uint32_t> flagsOpt = ConfigOptDefenition<uint32_t>(flags, CONFIG_SERVICE_SNTP, "flags", "f");
 
-ConfigOpt *opts[] = 
+ConfigOpt *opts[] =
 {
 // Wifi Network Strings
   new ConfigOptDefenition<String>(esid, "", "ssid", "ws"),
@@ -147,6 +151,10 @@ ConfigOpt *opts[] =
   new ConfigOptDefenition<uint16_t>(sleep_timer_not_connected, 0, "sleep_timer_not_connected", "tn"),
   new ConfigOptDefenition<uint16_t>(sleep_timer_connected, 0, "sleep_timer_connected", "tc"),
   new ConfigOptDefenition<uint16_t>(sleep_timer_disconnected, 0, "sleep_timer_disconnected", "td"),
+#if RGB_LED
+// LED brightness
+  new ConfigOptDefenition<uint8_t>(led_brightness, LED_DEFAULT_BRIGHTNESS, "led_brightness", "lb"),
+#endif
 
 // Flags
   &flagsOpt,
@@ -187,7 +195,7 @@ ResetEEPROM() {
 // Load saved settings from EEPROM
 // -------------------------------------------------------------------
 void
-config_load_settings() 
+config_load_settings()
 {
   config.onChanged(config_changed);
 
@@ -225,6 +233,10 @@ void config_changed(String name)
     teslaClient.setPass(tesla_password.c_str());
   } else if(name == "tesla_vehidx") {
     teslaClient.setVehicleIdx(tesla_vehidx);
+#if RGB_LED
+  } else if(name == "led_brightness") {
+    ledManager.setBrightness(led_brightness);
+#endif
   }
 }
 
@@ -242,7 +254,7 @@ bool config_deserialize(const char *json)
   return config.deserialize(json);
 }
 
-bool config_deserialize(DynamicJsonDocument &doc) 
+bool config_deserialize(DynamicJsonDocument &doc)
 {
   return config.deserialize(doc);
 }
@@ -259,16 +271,16 @@ bool config_serialize(DynamicJsonDocument &doc, bool longNames, bool compactOutp
 
 void config_set(const char *name, uint32_t val) {
   config.set(name, val);
-} 
+}
 void config_set(const char *name, String val) {
   config.set(name, val);
-} 
+}
 void config_set(const char *name, bool val) {
   config.set(name, val);
-} 
+}
 void config_set(const char *name, double val) {
   config.set(name, val);
-} 
+}
 
 void config_save_emoncms(bool enable, String server, String node, String apikey,
                     String fingerprint)
@@ -296,7 +308,7 @@ config_save_mqtt(bool enable, int protocol, String server, uint16_t port, String
   if(!reject_unauthorized) {
     newflags |= CONFIG_MQTT_ALLOW_ANY_CERT;
   }
-  newflags |= protocol << 4;  
+  newflags |= protocol << 4;
 
   config.set("mqtt_server", server);
   config.set("mqtt_port", port);
@@ -317,7 +329,7 @@ config_save_admin(String user, String pass) {
 }
 
 void
-config_save_sntp(bool sntp_enable, String tz) 
+config_save_sntp(bool sntp_enable, String tz)
 {
   uint32_t newflags = flags & ~CONFIG_SERVICE_SNTP;
   if(sntp_enable) {
