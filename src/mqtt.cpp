@@ -7,20 +7,27 @@
 #include "app_config.h"
 #include "divert.h"
 #include "input.h"
+#include "time_man.h"
 #include "espal.h"
 #include "net_manager.h"
+#include "load_balancer.h"
 
 #include "openevse.h"
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <MongooseMqttClient.h>
+#include <queue>
 
 MongooseMqttClient mqttclient;
 
 static long nextMqttReconnectAttempt = 0;
 static unsigned long mqttRestartTime = 0;
 static bool connecting = false;
+
+unsigned long checkCurrentAgain = 0;
+
+std::queue<std::array<String, 2>> logQueue;
 
 String lastWill = "";
 
@@ -74,6 +81,9 @@ void mqttmsg_callback(MongooseString topic, MongooseString payload) {
     if ((newdivert==1) || (newdivert==2)){
       divertmode_update(newdivert);
     }
+  }
+  else if (topic_string.substring(0, mqtt_topic.length()) != mqtt_topic){
+    load_balance_rapi_result(topic_string.substring(0, mqtt_topic.length()), payload);
   }
   else
   {
@@ -187,13 +197,52 @@ mqtt_connect()
     mqtt_sub_topic = mqtt_topic + "/divertmode/set";      // MQTT Topic to change divert mode
     mqttclient.subscribe(mqtt_sub_topic);
 
+    if(config_load_balancing_enabled()){
+      // MQTT Topic to subscribe to receive RAPI results from balanced devices
+      String balancing_topic = load_balancing_topics + "/rapi/out/#";
+      mqttclient.subscribe(balancing_topic); 
+    }
+
     connecting = false;
   });
 
   return true;
 }
 
+void 
+mqtt_log(String logLevel, String msg) {
+  if(!config_mqtt_enabled()) {
+    return;
+  }
 
+  char buffer[1000];
+  sprintf(buffer, "%s | %s", time_format_time(time(NULL)).c_str(), msg.c_str());
+
+  if(!mqttclient.connected()) {
+    String msg = buffer;
+    logQueue.push({logLevel, msg});
+    if(logQueue.size() > 100){
+      logQueue.pop();
+    }
+    return;
+  }
+
+  String topic = mqtt_topic;
+  topic.concat("/log/");
+  topic.concat(logLevel);
+
+  mqttclient.publish(topic, buffer);
+}
+
+void
+mqtt_log(String msg) {
+  mqtt_log("info", msg);
+}
+
+void
+mqtt_log_error(String msg) {
+  mqtt_log("error", msg);
+}
 
 // -------------------------------------------------------------------
 // Publish status to MQTT
@@ -219,6 +268,14 @@ mqtt_publish(JsonDocument &data) {
 }
 
 // -------------------------------------------------------------------
+// Publish a value to any topic
+// -------------------------------------------------------------------
+void 
+mqtt_publish(String topic, String value){
+    mqttclient.publish(topic, value);
+}
+
+// -------------------------------------------------------------------
 // MQTT state management
 //
 // Call every time around loop() if connected to the WiFi
@@ -239,11 +296,38 @@ mqtt_loop() {
   }
 
   if (config_mqtt_enabled() && !mqttclient.connected()) {
+
+    // Set current to a safe level
+    if(millis() > checkCurrentAgain){
+      rapiSender.sendCmd("$GE", [](int ret){
+        checkCurrentAgain = millis() + 2000;
+        if(ret == RAPI_RESPONSE_OK){
+          String ampString = rapiSender.getToken(1);
+          uint8_t amp = ampString.toInt();
+          if(amp > safe_current_level){
+            String command = "$SC ";
+            command.concat(safe_current_level);
+            rapiSender.sendCmd(F(command.c_str()));
+          }
+        }
+      });
+    }
+
     long now = millis();
     // try and reconnect every x seconds
     if (now > nextMqttReconnectAttempt) {
       nextMqttReconnectAttempt = now + MQTT_CONNECT_TIMEOUT;
       mqtt_connect(); // Attempt to reconnect
+    }
+  }
+
+  if(config_mqtt_enabled() && mqttclient.connected()){
+    while(!logQueue.empty()){
+      String topic = mqtt_topic;
+      topic.concat("/log/");
+      topic.concat(logQueue.front()[0]);
+      mqttclient.publish(topic.c_str(), logQueue.front()[1].c_str());
+      logQueue.pop();
     }
   }
 

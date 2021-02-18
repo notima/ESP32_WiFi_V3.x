@@ -13,6 +13,9 @@
 #define MQTT_PROTOCOL_WEBSOCKET     2
 #define MQTT_PROTOCOL_WEBSOCKET_SSL 3
 
+extern void mqtt_log(String msg);
+extern void mqtt_log_error(String msg);
+
 extern void mqtt_msg_callback();
 
 // -------------------------------------------------------------------
@@ -27,6 +30,8 @@ extern void mqtt_loop();
 // data: a comma seperated list of name:value pairs to send
 // -------------------------------------------------------------------
 extern void mqtt_publish(JsonDocument &data);
+
+extern void mqtt_publish(String topic, String value);
 
 // -------------------------------------------------------------------
 // Restart the MQTT connection

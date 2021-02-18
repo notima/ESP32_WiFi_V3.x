@@ -42,6 +42,11 @@ extern String mqtt_grid_ie;
 extern String mqtt_vrms;
 extern String mqtt_announce_topic;
 
+// Load Balancing settings
+extern uint8_t safe_current_level;
+extern uint8_t total_current;
+extern String load_balancing_topics;
+
 // RFID storage
 extern String rfid_storage;
 
@@ -74,6 +79,7 @@ extern uint32_t flags;
 #define CONFIG_CHARGE_MODE          (7 << 10) // 3 bits for mode
 #define CONFIG_PAUSE_USES_DISABLED   (1 << 13)
 #define CONFIG_RFID                 (1 << 14)
+#define CONFIG_LOAD_BALANCING       (1 << 15)
 
 inline bool config_emoncms_enabled() {
   return CONFIG_SERVICE_EMONCMS == (flags & CONFIG_SERVICE_EMONCMS);
@@ -117,6 +123,10 @@ inline bool config_pause_uses_disabled() {
 
 inline bool config_rfid_enabled() {
   return CONFIG_RFID == (flags & CONFIG_RFID);
+}
+
+inline bool config_load_balancing_enabled() {
+  return CONFIG_LOAD_BALANCING == (flags & CONFIG_LOAD_BALANCING);
 }
 
 // Ohm Connect Settings
@@ -167,6 +177,11 @@ extern void config_save_ohm(bool enable, String qohm);
 // Save RFID settings
 // -------------------------------------------------------------------
 extern void config_save_rfid(bool enable, String storage);
+
+// -------------------------------------------------------------------
+// Save Load Balancing enabled
+// -------------------------------------------------------------------
+extern void config_save_load_balancing(bool enable);
 
 // -------------------------------------------------------------------
 // Save the flags

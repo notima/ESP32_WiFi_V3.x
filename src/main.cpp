@@ -50,6 +50,7 @@
 #include "tesla_client.h"
 #include "event.h"
 #include "rfid.h"
+#include "load_balancer.h"
 
 #include "LedManagerTask.h"
 #include "evse_man.h"
@@ -72,6 +73,7 @@ RapiSender &rapiSender = evse.getSender();
 
 unsigned long Timer1; // Timer for events once every 30 seconds
 unsigned long Timer3; // Timer for events once every 2 seconds
+unsigned long Timer4; // Timer for events once every 5 minutes
 
 boolean rapi_read = 0; //flag to indicate first read of RAPI status
 
@@ -128,6 +130,14 @@ void setup()
 
   // Bring up the web server
   web_server_setup();
+
+  // Start printing logs to mqtt
+  SerialDebug.onWrite([](const uint8_t *buffer, size_t size)
+  {
+    String str = (char*)buffer;
+    mqtt_log(str);
+  });
+
   DBUGF("After web_server_setup: %d", ESPAL.getFreeHeap());
 
 #ifdef ENABLE_OTA
@@ -156,9 +166,9 @@ loop() {
 
   web_server_loop();
   net_loop();
-#ifdef ENABLE_OTA
+  #ifdef ENABLE_OTA
   ota_loop();
-#endif
+  #endif
   rapiSender.loop();
   divert_current_loop();
   MicroTask.update();
@@ -182,14 +192,21 @@ loop() {
       // Do these things once every 2s
       // -------------------------------------------------------------------
       if ((millis() - Timer3) >= 2000) {
+        update_rapi_values();
+        Timer3 = millis();
+      }
+
+      // -------------------------------------------------------------------
+      // Do these things once every 5 minutes
+      // -------------------------------------------------------------------
+      if ((millis() - Timer4) >= 300 * 1000){
         uint32_t current = ESPAL.getFreeHeap();
         int32_t diff = (int32_t)(last_mem - current);
         if(diff != 0) {
           DEBUG.printf("%s: Free memory %u - diff %d %d\n", time_format_time(time(NULL)).c_str(), current, diff, start_mem - current);
           last_mem = current;
         }
-        update_rapi_values();
-        Timer3 = millis();
+        Timer4 = millis();
       }
     }
   }

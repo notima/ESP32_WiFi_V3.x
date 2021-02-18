@@ -7,15 +7,16 @@
 #include "RapiSender.h"
 #include "input.h"
 #include "openevse.h"
+#include "load_balancer.h"
 
 DFRobot_PN532_IIC nfc(PN532_IRQ, PN532_POLLING); 
 
 RfidTask::RfidTask() :
-  MicroTasks::Task(),
-  _evse(NULL),
-  _scheduler(NULL),
-  _evseStateEvent(this),
-  nfc(PN532_IRQ, PN532_POLLING)
+    MicroTasks::Task(),
+    _evse(NULL),
+    _scheduler(NULL),
+    _evseStateEvent(this),
+    nfc(PN532_IRQ, PN532_POLLING)
 {
 }
 
@@ -70,8 +71,11 @@ void RfidTask::scanCard(){
             storedTagStr.trim();
             uid.trim();
             if(storedTagStr.compareTo(uid) == 0){
-                rapiSender.sendCmd(F("$FE"));
-                //schedulePause();
+                if(config_load_balancing_enabled){
+                    safe_wakeup();
+                }else{
+                    rapiSender.sendCmd(F("$FE"));
+                }
                 break;
             }
             storedTag = strtok(NULL, ",");

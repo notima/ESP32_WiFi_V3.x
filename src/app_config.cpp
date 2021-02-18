@@ -46,6 +46,11 @@ String mqtt_grid_ie;
 String mqtt_vrms;
 String mqtt_announce_topic;
 
+// Load Balancing Settings
+uint8_t safe_current_level;
+uint8_t total_current;
+String load_balancing_topics;
+
 // Sleep timer
 uint8_t sleep_timer_enabled_flags;
 uint16_t sleep_timer_not_connected;
@@ -115,6 +120,11 @@ ConfigOpt *opts[] =
   new ConfigOptDefenition<String>(mqtt_vrms, "emon/emonpi/vrms", "mqtt_vrms", "mv"),
   new ConfigOptDefenition<String>(mqtt_announce_topic, "openevse/announce/"+ESPAL.getShortId(), "mqtt_announce_topic", "ma"),
 
+// Load Balancing settings
+  new ConfigOptDefenition<uint8_t>(safe_current_level, 7, "safe_current_level", "bs"),
+  new ConfigOptDefenition<uint8_t>(total_current, 7, "total_current", "bc"),
+  new ConfigOptDefenition<String>(load_balancing_topics, "", "load_balancing_topics", "bt"),
+
 // Ohm Connect Settings
   new ConfigOptDefenition<String>(ohm, "", "ohm", "o"),
 
@@ -151,6 +161,7 @@ ConfigOpt *opts[] =
   new ConfigOptVirtualBool(flagsOpt, CONFIG_SERVICE_DIVERT, CONFIG_SERVICE_DIVERT, "divert_enabled", "de"),
   new ConfigOptVirtualBool(flagsOpt, CONFIG_PAUSE_USES_DISABLED, CONFIG_PAUSE_USES_DISABLED, "pause_uses_disabled", "pd"),
   new ConfigOptVirtualBool(flagsOpt, CONFIG_RFID, CONFIG_RFID, "rfid_enabled", "rf"),
+  new ConfigOptVirtualBool(flagsOpt, CONFIG_LOAD_BALANCING, CONFIG_LOAD_BALANCING, "load_balancing_enabled", "lb"),
   new ConfigOptVirtualMqttProtocol(flagsOpt, "mqtt_protocol", "mprt"),
   new ConfigOptVirtualChargeMode(flagsOpt, "charge_mode", "chmd")
 };
@@ -369,6 +380,15 @@ config_save_rfid(bool enable, String storage){
   config.set("flags", newflags);
   config.set("rfid_storage", rfid_storage);
   config.commit();
+}
+
+void
+config_save_load_balancing(bool enable){
+  uint32_t newflags = flags & ~CONFIG_LOAD_BALANCING;
+  if(enable) {
+    newflags |= CONFIG_LOAD_BALANCING;
+  }
+  config_save_flags(newflags);
 }
 
 void
