@@ -20,6 +20,8 @@ class RfidTask : public MicroTasks::Task {
         EvseManager *_evse;
         Scheduler *_scheduler;
         MicroTasks::EventListener _evseStateEvent;
+        long lastState;
+        DFRobot_PN532_IIC nfc; 
         uint8_t status = RFID_STATUS_NOT_ENABLED;
         boolean hasContact = false;
         uint8_t waitingForTag = 0;
@@ -30,10 +32,9 @@ class RfidTask : public MicroTasks::Task {
         void setup();
         unsigned long loop(MicroTasks::WakeReason reason);
         struct card NFCcard;
-        void verifyUID(String uid);
-        void checkState();
-        void schedulePause();
-        void abortSchedule();
+        void scanCard();
+        void startTimer(uint8_t seconds);
+        void abortTimer();
 
     public:
         RfidTask();
@@ -41,6 +42,7 @@ class RfidTask : public MicroTasks::Task {
         uint8_t getStatus();
         void waitForTag(uint8_t seconds);
         DynamicJsonDocument rfidPoll();
+        boolean wakeup();
 };
 
 

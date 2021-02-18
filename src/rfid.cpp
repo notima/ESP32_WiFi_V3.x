@@ -7,15 +7,6 @@
 #include "RapiSender.h"
 #include "input.h"
 #include "openevse.h"
-#include "Wire.h"
-
-#ifndef I2C_SDA
-#define I2C_SDA 21
-#endif
-
-#ifndef I2C_SCL
-#define I2C_SCL 22
-#endif
 
 DFRobot_PN532_IIC nfc(PN532_IRQ, PN532_POLLING); 
 
@@ -23,7 +14,8 @@ RfidTask::RfidTask() :
   MicroTasks::Task(),
   _evse(NULL),
   _scheduler(NULL),
-  _evseStateEvent(this)
+  _evseStateEvent(this),
+  nfc(PN532_IRQ, PN532_POLLING)
 {
 }
 
@@ -31,31 +23,36 @@ void RfidTask::begin(EvseManager &evse, Scheduler &scheduler){
     _evse = &evse;
     _scheduler = &scheduler;
     MicroTask.startTask(this);
+    // HACK
+    // Schedulers do not work unless this one exists
+    _scheduler->addEvent(100, 0, 0, 0, ~0, EvseState(EvseState::Disabled));
 }
 
 void RfidTask::setup(){
+    _evse->onStateChange(&_evseStateEvent);
+
     if(!config_rfid_enabled()){
         status = RFID_STATUS_NOT_ENABLED;
         return;
     }
-
-    Wire.begin(I2C_SDA, I2C_SCL);
     
-    if(nfc.begin()){
-        status = RFID_STATUS_ACTIVE;
-    }else{
-        if(status == RFID_STATUS_NOT_FOUND){
-            config_save_rfid(false, rfid_storage);
-            DEBUG.println("RFID still not responding and has been disabled.");
-        }else{
-            DEBUG.println("RFID module did not respond!");
-            status = RFID_STATUS_NOT_FOUND;
-        }
-    }
+    wakeup();
 }
 
-void RfidTask::verifyUID(String uid){
-    Serial.printf("\n%s\n", uid.c_str());
+boolean RfidTask::wakeup(){
+    boolean awake = nfc.begin();
+    if(awake){
+        status = RFID_STATUS_ACTIVE;
+    }else{
+        DEBUG.println("RFID module did not respond!");
+        status = RFID_STATUS_NOT_FOUND;
+    }
+    return awake;
+}
+
+void RfidTask::scanCard(){
+    NFCcard = nfc.getInformation();
+    String uid = nfc.readUid();
 
     if(waitingForTag > 0){
         waitingForTag = 0;
@@ -84,9 +81,23 @@ void RfidTask::verifyUID(String uid){
         DynamicJsonDocument data(4096);
         data["rfid"] = uid;
         mqtt_publish(data);
-                rapiSender.sendCmd(F("$FE"));
-                schedulePause();
     }
+}
+
+void RfidTask::startTimer(uint8_t seconds){
+    static int day = 0;
+    static int32_t offset = 0;
+    _scheduler->getCurrentTime(day, offset);
+    offset += seconds;
+    int schedulerDay = 1 << day;
+    int hour = offset / 3600;
+    int minute = (offset % 3600) / 60;
+    int second = offset % 60;
+    _scheduler->addEvent(0xFFFFFFFF, hour, minute, second, schedulerDay, EvseState(EvseState::Disabled));
+}
+
+void RfidTask::abortTimer(){
+    _scheduler->removeEvent(0xFFFFFFFF);
 }
 
 unsigned long RfidTask::loop(MicroTasks::WakeReason reason){
@@ -98,9 +109,19 @@ unsigned long RfidTask::loop(MicroTasks::WakeReason reason){
         return MicroTask.WaitForMask;
     }
 
-    if(status != RFID_STATUS_ACTIVE){
-        this->setup();
-        return nextScan;
+    if(_evseStateEvent.IsTriggered()){
+        abortTimer();
+        uint8_t _state = evse.getEvseState();
+        if(_state == OPENEVSE_STATE_NOT_CONNECTED && lastState >= OPENEVSE_STATE_SLEEPING){
+            startTimer(sleep_timer_not_connected);
+        }
+        else if(_state == OPENEVSE_STATE_NOT_CONNECTED){
+            startTimer(sleep_timer_disconnected);
+        }
+        else if(_state == OPENEVSE_STATE_CONNECTED){
+            startTimer(sleep_timer_connected);
+        }
+        lastState = _state;
     }
 
     if(waitingForTag > 0){
@@ -110,15 +131,11 @@ unsigned long RfidTask::loop(MicroTasks::WakeReason reason){
         lcd.display("Waiting for RFID", 0, 0, 0, LCD_CLEAR_LINE);
         lcd.display(msg, 0, 1, 1000, LCD_CLEAR_LINE);
     }
-
-    boolean foundCard = false;
-    if((state >= OPENEVSE_STATE_SLEEPING || waitingForTag)){
-        nfc.begin();
-        foundCard = nfc.scan();
-    }
+    
+    boolean foundCard = (state >= OPENEVSE_STATE_SLEEPING || waitingForTag) && nfc.scan();
 
     if(foundCard && !hasContact){
-        verifyUID(nfc.readUid());
+        scanCard();
         hasContact = true;
         return nextScan;
     }
@@ -128,10 +145,6 @@ unsigned long RfidTask::loop(MicroTasks::WakeReason reason){
     }
 
     return nextScan;
-}
-
-void RfidTask::schedulePause(){
-    //_scheduler->addEvent((uint32_t)100, 11, 27, 00, SCHEDULER_DAY_TUESDAY, EvseState(EvseState::Disabled));
 }
 
 uint8_t RfidTask::getStatus(){
