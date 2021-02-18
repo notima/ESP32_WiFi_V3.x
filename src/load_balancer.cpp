@@ -78,7 +78,7 @@ void load_balancing_loop(){
             msgRoll = 0;
             DEBUG.println("safety check timed out.");
             char msg[50];
-            sprintf(msg, "Safety check timed out! %s might be offline.", load_balancing_topics);
+            sprintf(msg, "Safety check timed out! %s might be offline.", load_balancing_topics.c_str());
             mqtt_log_error(msg);
         }
     }else{
@@ -122,7 +122,7 @@ void load_balance_rapi_result(String device, String result){
     else{
         rapiSender.sendCmd(F("$FB 1"));
         char msg[50];
-        sprintf(msg ,"Incorrect response received from %s. Last command: %s. Response: %s.", device, lastCommand, result);
+        sprintf(msg ,"Incorrect response received from %s. Last command: %s. Response: %s.", device.c_str(), lastCommand.c_str(), result.c_str());
         mqtt_log_error(msg);
     }
 }
