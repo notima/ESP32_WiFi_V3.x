@@ -7,36 +7,47 @@
 #include "lcd.h"
 #include "sleep_timer.h"
 
-#include <functional>
-
 #define RAPI_GET_STATE "/rapi/in/$GS"
 #define RAPI_SET_CURRENT "/rapi/in/$SC"
-
-#define IDLE_TICK_RATE 5000
-#define WAKING_TICK_RATE 200
 
 #define MQTT_TIMEOUT 10000
 #define MQTT_TIMEOUT_MSG "     Unable to determine a safe current level. "
 
-unsigned long nextTick = 0;
+#define LOAD_BALANCER_STATUS_IDLE 0
+#define LOAD_BALANCER_STATUS_WAKING 1
+#define LOAD_BALANCER_STATUS_WAITING 2
+#define LOAD_BALANCER_STATUS_TIMEOUT 3
+
 unsigned long wakeupStarted = 0;
 
-std::function<void(String)> rapi_callback = [](String result){};
-bool waking_up = false;
-bool timed_out = false;
 
 String lastCommand = "";
 
-void sendCommand(String topic, String command, std::function<void(String)> callback){
+LoadBalancer::LoadBalancer() :
+  MicroTasks::Task() {
+}
+
+void LoadBalancer::begin() {
+  MicroTask.startTask(this);
+}
+
+void LoadBalancer::setup() {
+}
+
+void LoadBalancer::sendCommand(String topic, String command, std::function<void(boolean, String)> callback){
     mqtt_publish(topic, command);
     rapi_callback = callback;
     lastCommand = command;
 }
 
-void setCurrent(int current){
+void LoadBalancer::setCurrent(int current, std::function<void()> onSuccess){
     String cmd = "$SC ";
     cmd.concat(current);
-    rapiSender.sendCmd(cmd);
+    rapiSender.sendCmd(cmd, [onSuccess](int ret) {
+        if(RAPI_RESPONSE_OK == ret) {
+            onSuccess();
+        }
+    });
 }
 
 String getToken(String string, int index){
@@ -44,38 +55,62 @@ String getToken(String string, int index){
     string.toCharArray(charArr, string.length()+1);
     char* token = strtok(charArr, " ");
     for(uint8_t i = 0; i < index; i++){
+        if(!token)
+            return "";
         token = strtok(NULL, " ");
     }
     return token;
 }
 
-void safetyCheck(std::function<void()> onSafe){
-    sendCommand(load_balancing_topics + RAPI_GET_STATE, "", [onSafe](String result){
+void LoadBalancer::safetyCheck(std::function<void(boolean)> onSafe){
+    sendCommand(load_balancing_topics + RAPI_GET_STATE, "", [this, onSafe](boolean ok, String result){
+        if(!ok)
+            return;
         uint8_t state = atoi(getToken(result, 1).c_str());
+        uint8_t current;
+        boolean otherAwake;
         if(state >= OPENEVSE_STATE_SLEEPING){
-            setCurrent(total_current);
-            onSafe();
+            current = total_current;
+            otherAwake = false;
         }else{
-            setCurrent(safe_current_level);
-            onSafe();
+            current = safe_current_level;
+            otherAwake = true;
         }
+        setCurrent(current, [onSafe, otherAwake](){
+            onSafe(otherAwake);
+        });
     });
 }
 
-uint8_t msgRoll = 0;
-void load_balancing_loop(){
-    if(millis() < nextTick)
-        return;
+void showWaitIndicator(){
+    lcd_display("Please wait...", 0, 0, 0, LCD_CLEAR_LINE);
+    lcd_display("", 0, 1, 3100, LCD_CLEAR_LINE);
+    rapiSender.sendCmd(F("$FB 6"));
+}
 
-    if(waking_up){
+uint8_t msgRoll = 0;
+unsigned long LoadBalancer::loop(MicroTasks::WakeReason reason){
+    switch (status) {
+    case LOAD_BALANCER_STATUS_WAKING:
         if(wakeupStarted - millis() < MQTT_TIMEOUT){
-            lcd_display("Please wait...", 0, 0, 0, LCD_CLEAR_LINE);
-            lcd_display("", 0, 1, 1000, LCD_CLEAR_LINE);
-            rapiSender.sendCmd(F("$FB 6"));
-            nextTick = millis() + WAKING_TICK_RATE;
+            showWaitIndicator();
+            if(safe_current_level == 0){
+                status = LOAD_BALANCER_STATUS_WAITING;
+                break;
+            }
+            safetyCheck([this](boolean otherAwake){
+                String currentStr = "";
+                currentStr.concat(safe_current_level);
+                sendCommand(load_balancing_topics + RAPI_SET_CURRENT, currentStr, [this](boolean ok, String result){
+                    if(ok){
+                        sleep_timer_display_updates(true);
+                        rapiSender.sendCmd(F("$FE"));
+                    }
+                    status = LOAD_BALANCER_STATUS_IDLE;
+                });
+            });
         }else{
-            waking_up = false;
-            timed_out = true;
+            status = LOAD_BALANCER_STATUS_TIMEOUT;
             msgRoll = 0;
             DEBUG.println("safety check timed out.");
             char msg[50];
@@ -83,53 +118,61 @@ void load_balancing_loop(){
             mqtt_log_error(msg);
             sleep_timer_display_updates(true);
         }
-    }else{
-        if(timed_out){
-            sleep_timer_display_updates(false);
-            safetyCheck([](){
-                timed_out = false;
-            sleep_timer_display_updates(true);
-            });
-            rapiSender.sendCmd(F("$FB 1"));
-            lcd_display("Out of order", 0, 0, 0, LCD_CLEAR_LINE);
-            for(uint8_t i = 0; i < IDLE_TICK_RATE / 500; i++)
-                lcd_display(MQTT_TIMEOUT_MSG + (msgRoll++ % strlen(MQTT_TIMEOUT_MSG)), 0, 1, 500, LCD_CLEAR_LINE);
-            if(msgRoll >= strlen(MQTT_TIMEOUT_MSG) * 2){
-                timed_out = false;
+        break;
+
+    case LOAD_BALANCER_STATUS_WAITING:
+        lcd_display("Not charging", 0, 0, 0, LCD_CLEAR_LINE);
+        lcd_display("", 0, 1, 3100, LCD_CLEAR_LINE);
+        rapiSender.sendCmd(F("$FB 6"));
+        safetyCheck([this](boolean otherAwake){
+            if(!otherAwake){
                 sleep_timer_display_updates(true);
+                rapiSender.sendCmd(F("$FE"));
+                status = LOAD_BALANCER_STATUS_IDLE;
             }
-        }else{
-            safetyCheck([](){});
+        });
+        break;
+    
+    case LOAD_BALANCER_STATUS_TIMEOUT:
+        sleep_timer_display_updates(false);
+        safetyCheck([this](boolean otherAwake){
+            status = LOAD_BALANCER_STATUS_IDLE;
+            sleep_timer_display_updates(true);
+        });
+        rapiSender.sendCmd(F("$FB 1"));
+        lcd_display("Out of order", 0, 0, 0, LCD_CLEAR_LINE);
+        for(uint8_t i = 0; i < 2; i++)
+            lcd_display(MQTT_TIMEOUT_MSG + (msgRoll++ % strlen(MQTT_TIMEOUT_MSG)), 0, 1, 500, LCD_CLEAR_LINE);
+        if(msgRoll >= strlen(MQTT_TIMEOUT_MSG) * 2){
+            status = LOAD_BALANCER_STATUS_IDLE;
+            sleep_timer_display_updates(true);
         }
-        nextTick = millis() + IDLE_TICK_RATE;
+        break;
+        
+    case LOAD_BALANCER_STATUS_IDLE:
+    default:
+        safetyCheck([](boolean otherAwake){});
     }
+    return 1000;
 }
 
-void safe_wakeup(){
+void LoadBalancer::wakeup(){
     sleep_timer_display_updates(false);
-    waking_up = true;
+    status = LOAD_BALANCER_STATUS_WAKING;
     DEBUG.println("Waking up");
     wakeupStarted = millis() + MQTT_TIMEOUT;
-    nextTick = millis();
-    safetyCheck([](){
-        String currentStr = "";
-        currentStr.concat(safe_current_level);
-        sendCommand(load_balancing_topics + RAPI_SET_CURRENT, currentStr, [](String result){
-            sleep_timer_display_updates(true);
-            rapiSender.sendCmd(F("$FE"));
-            waking_up = false;
-        });
-    });
+    showWaitIndicator();
 }
 
-void load_balance_rapi_result(String device, String result){
-    if(getToken(result, 0) == "$OK" && device == load_balancing_topics){
-        rapi_callback(result);
-    }
-    else{
+void LoadBalancer::reportRapiResult(String device, String result){
+    boolean ok = getToken(result, 0) == "$OK";
+    if(!ok && device == load_balancing_topics){
         rapiSender.sendCmd(F("$FB 1"));
-        char msg[50];
+        char msg[100];
         sprintf(msg ,"Incorrect response received from %s. Last command: %s. Response: %s.", device, lastCommand, result);
         mqtt_log_error(msg);
     }
+    rapi_callback(ok, result);
 }
+
+LoadBalancer loadBalancer;

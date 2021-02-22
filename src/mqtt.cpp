@@ -83,7 +83,7 @@ void mqttmsg_callback(MongooseString topic, MongooseString payload) {
     }
   }
   else if (topic_string.substring(0, mqtt_topic.length()) != mqtt_topic){
-    load_balance_rapi_result(topic_string.substring(0, mqtt_topic.length()), payload);
+    loadBalancer.reportRapiResult(topic_string.substring(0, mqtt_topic.length()), payload);
   }
   else
   {
