@@ -112,6 +112,7 @@ void setup()
   DBUGF("After web_server_setup: %d", ESPAL.getFreeHeap());
 
   rfid_setup();
+  loadBalancer.begin();
 
 #ifdef ENABLE_OTA
   ota_setup();
@@ -148,7 +149,6 @@ loop() {
   divert_current_loop();
   time_loop();
   rfid_loop();
-  load_balancing_loop();
   if(config_rfid_enabled())
     sleep_timer_loop();
 
