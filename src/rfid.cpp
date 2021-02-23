@@ -94,8 +94,10 @@ void scanCard(){
                 lcd_release();
                 if(config_load_balancing_enabled())
                     loadBalancer.wakeup();
-                else
+                else{
                     rapiSender.sendCmd(F("$FE"));
+                    sleep_timer_display_updates(true);
+                }
                 break;
             }
             storedTag = strtok(NULL, ",");
