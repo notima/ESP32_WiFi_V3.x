@@ -117,6 +117,7 @@ void setup()
   evse.begin();
   scheduler.begin();
 
+  loadBalancer.begin(evse);
   rfid.begin(evse, scheduler);
   lcd.begin(evse, scheduler);
   MicroTask.startTask(ledManager);

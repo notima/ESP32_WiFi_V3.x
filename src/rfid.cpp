@@ -68,7 +68,7 @@ void RfidTask::scanCard(){
             uid.trim();
             if(storedTagStr.compareTo(uid) == 0){
                 if(config_load_balancing_enabled){
-                    safe_wakeup();
+                    loadBalancer.wakeup();
                 }else{
                     _evse->getOpenEVSE().enable([](int ret){});
                 }
