@@ -111,7 +111,7 @@ void scanCard(){
             uidHex.trim();
             if(storedTagStr.compareTo(uidHex) == 0){
                 lcd_release();
-                if(config_load_balancing_enabled)
+                if(config_load_balancing_enabled())
                     loadBalancer.wakeup();
                 else
                     rapiSender.sendCmd(F("$FE"));

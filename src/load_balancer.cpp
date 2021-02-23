@@ -11,7 +11,9 @@
 #define RAPI_SET_CURRENT "/rapi/in/$SC"
 
 #define MQTT_TIMEOUT 10000
-#define MQTT_TIMEOUT_MSG "     Unable to determine a safe current level. "
+
+#define MQTT_TIMEOUT_MSG "        Unable to determine a safe current level. "
+#define WAITING_FOR_CURRENT_MSG "        Waiting for current to be available. "
 
 #define LOAD_BALANCER_STATUS_IDLE 0
 #define LOAD_BALANCER_STATUS_WAKING 1
@@ -90,6 +92,8 @@ void showWaitIndicator(){
 
 uint8_t msgRoll = 0;
 unsigned long LoadBalancer::loop(MicroTasks::WakeReason reason){
+    if(!config_load_balancing_enabled())
+        return 10000;
     switch (status) {
     case LOAD_BALANCER_STATUS_WAKING:
         if(wakeupStarted - millis() < MQTT_TIMEOUT){
@@ -114,7 +118,7 @@ unsigned long LoadBalancer::loop(MicroTasks::WakeReason reason){
             msgRoll = 0;
             DEBUG.println("safety check timed out.");
             char msg[50];
-            sprintf(msg, "Safety check timed out! %s might be offline.", load_balancing_topics);
+            sprintf(msg, "Safety check timed out! %s might be offline.", load_balancing_topics.c_str());
             mqtt_log_error(msg);
             sleep_timer_display_updates(true);
         }
@@ -122,7 +126,8 @@ unsigned long LoadBalancer::loop(MicroTasks::WakeReason reason){
 
     case LOAD_BALANCER_STATUS_WAITING:
         lcd_display("Not charging", 0, 0, 0, LCD_CLEAR_LINE);
-        lcd_display("", 0, 1, 3100, LCD_CLEAR_LINE);
+        for(uint8_t i = 0; i < 2; i++)
+            lcd_display(WAITING_FOR_CURRENT_MSG + (msgRoll++ % strlen(WAITING_FOR_CURRENT_MSG)), 0, 1, 500, LCD_CLEAR_LINE);
         rapiSender.sendCmd(F("$FB 6"));
         safetyCheck([this](boolean otherAwake){
             if(!otherAwake){
@@ -169,7 +174,7 @@ void LoadBalancer::reportRapiResult(String device, String result){
     if(!ok && device == load_balancing_topics){
         rapiSender.sendCmd(F("$FB 1"));
         char msg[100];
-        sprintf(msg ,"Incorrect response received from %s. Last command: %s. Response: %s.", device, lastCommand, result);
+        sprintf(msg ,"Incorrect response received from %s. Last command: %s. Response: %s.", device.c_str(), lastCommand.c_str(), result.c_str());
         mqtt_log_error(msg);
     }
     rapi_callback(ok, result);
