@@ -70,25 +70,6 @@ String getUidHex(card NFCcard){
     return uidHex;
 }
 
-String getUidBytes(card NFCcard){
-    String bytes = "";
-    bytes.concat((char)NFCcard.uidlenght);
-    for(int i = 0; i < NFCcard.uidlenght; i+= 1){
-        bytes.concat((char)NFCcard.uid[i]);
-    }
-
-    Serial.println();
-    Serial.println(bytes);
-    Serial.println();
-
-    const char* ptr = bytes.c_str();
-    for(int i = 0; i < 4; i++){
-        Serial.print((int)ptr[i], HEX);
-    }
-
-    return bytes;
-}
-
 void scanCard(){
     NFCcard = nfc.getInformation();
     String uidHex = getUidHex(NFCcard);
