@@ -79,7 +79,7 @@ void scanCard(){
         cardFound = true;
         lcd_display("Tag detected!", 0, 0, 0, LCD_CLEAR_LINE);
         lcd_display(uidHex, 0, 1, 3000, LCD_CLEAR_LINE);
-        sleep_timer_display_updates(true);
+        sleepTimer.sleep_timer_display_updates(true);
     }else{
         // Check if tag is stored locally
         char storedTags[rfid_storage.length() + 1];
@@ -96,7 +96,7 @@ void scanCard(){
                     loadBalancer.wakeup();
                 else{
                     rapiSender.sendCmd(F("$FE"));
-                    sleep_timer_display_updates(true);
+                    sleepTimer.sleep_timer_display_updates(true);
                 }
                 break;
             }
@@ -133,7 +133,7 @@ void rfid_loop(){
         lcd_display("Waiting for RFID", 0, 0, 0, LCD_CLEAR_LINE);
         lcd_display(msg, 0, 1, 1000, LCD_CLEAR_LINE);
         if(waitingForTag < 1)
-            sleep_timer_display_updates(true);
+            sleepTimer.sleep_timer_display_updates(true);
     }
 
     nextScan = millis() + SCAN_FREQ;
@@ -158,7 +158,7 @@ uint8_t rfid_status(){
 void rfid_wait_for_tag(uint8_t seconds){
     if(!config_rfid_enabled())
         return;
-    sleep_timer_display_updates(false);
+    sleepTimer.sleep_timer_display_updates(false);
     lcd_release();
     waitingForTag = seconds;
     stopWaiting = millis() + seconds * 1000;

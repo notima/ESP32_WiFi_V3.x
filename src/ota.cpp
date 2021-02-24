@@ -21,7 +21,7 @@ void ota_setup()
     // Clean SPIFFS
     //SPIFFS.end();
     DBUGF("Starting ArduinoOTA update");
-    sleep_timer_display_updates(false);
+    sleepTimer.sleep_timer_display_updates(false);
     lcd_display(F("Updating WiFi"), 0, 0, 0, LCD_CLEAR_LINE);
     lcd_display(F(""), 0, 1, 10 * 1000, LCD_CLEAR_LINE);
     lcd_loop();
@@ -50,7 +50,7 @@ void ota_setup()
     text += error;
     text += F("]");
     lcd_display(text, 0, 1, 5 * 1000, LCD_CLEAR_LINE | LCD_DISPLAY_NOW);
-    sleep_timer_display_updates(true);
+    sleepTimer.sleep_timer_display_updates(true);
   });
 }
 

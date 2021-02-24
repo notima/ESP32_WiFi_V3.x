@@ -2,12 +2,20 @@
 #include "input.h"
 #include "lcd.h"
 #include "app_config.h"
+#include "debug.h"
 #include <openevse.h>
 
-unsigned long nextTimerTick = 0;
-unsigned long goToSleep = 0;
-bool counting = true;
-bool displayUpdates = true;
+SleepTimer::SleepTimer() : MicroTasks::Task() {
+
+}
+
+void SleepTimer::begin(){
+    MicroTask.startTask(this);
+}
+
+void SleepTimer::setup(){
+
+}
 
 String createTimeString(uint16_t seconds){
     String str = "";
@@ -21,9 +29,9 @@ String createTimeString(uint16_t seconds){
     return str;
 }
 
-void updateDisplay(){
+void SleepTimer::updateDisplay(){
     uint8_t messageToDisplay = millis() / 2000 % 4;
-    if(messageToDisplay == 0 && state == OPENEVSE_STATE_NOT_CONNECTED){
+    if(messageToDisplay == 0 && state == OPENEVSE_STATE_NOT_CONNECTED && counting){
         lcd_display("Connect your", 0, 0, 0, LCD_CLEAR_LINE);
         lcd_display("vehicle", 0, 1, 1100, LCD_CLEAR_LINE);
     }else if(messageToDisplay == 0 && state == OPENEVSE_STATE_CONNECTED){
@@ -40,12 +48,7 @@ void updateDisplay(){
     }
 }
 
-void sleep_timer_loop(){
-    if (millis() < nextTimerTick)
-        return;
-
-    nextTimerTick = millis() + 1000;
-
+unsigned long SleepTimer::loop(MicroTasks::WakeReason reason){
     if(counting){
         if(millis() > goToSleep){
             // Simulate a button press in case there is a timer active
@@ -58,29 +61,49 @@ void sleep_timer_loop(){
     if(displayUpdates){
         updateDisplay();
     }
+
+    return 1000;
 }
 
-void on_wake_up(){
-    if((sleep_timer_enabled_flags & SLEEP_TIMER_NOT_CONNECTED_FLAG) == SLEEP_TIMER_NOT_CONNECTED_FLAG){
-        goToSleep = millis() + sleep_timer_not_connected * 1000;
-        counting = true;
+void SleepTimer::setTimer(uint16_t seconds){
+    goToSleep = millis() + seconds * 1000;
+    counting = true;
+    DEBUG.printf("Timer set for %d seconds\n", seconds);
+}
+
+void SleepTimer::stopTimer() {
+    counting = false;
+    DEBUG.println("Timer stopped");
+}
+
+void SleepTimer::onStateChange(uint8_t state){
+    DEBUG.printf("State changed to: %d\n", state);
+    stopTimer();
+
+    if(evseState >= OPENEVSE_STATE_SLEEPING && state == OPENEVSE_STATE_NOT_CONNECTED && config_rfid_enabled){
+        if((sleep_timer_enabled_flags & SLEEP_TIMER_NOT_CONNECTED_FLAG) == SLEEP_TIMER_NOT_CONNECTED_FLAG){
+            DEBUG.println("Woke up");
+            setTimer(sleep_timer_not_connected);
+        }
     }
-}
-
-void on_vehicle_connected(){
-    if((sleep_timer_enabled_flags & SLEEP_TIMER_CONNECTED_FLAG) == SLEEP_TIMER_CONNECTED_FLAG){
-        goToSleep = millis() + sleep_timer_connected * 1000;
-        counting = true;
+    else if(state == OPENEVSE_STATE_CONNECTED){
+        if((sleep_timer_enabled_flags & SLEEP_TIMER_CONNECTED_FLAG) == SLEEP_TIMER_CONNECTED_FLAG){
+            DEBUG.println("Connected");
+            setTimer(sleep_timer_connected);
+        }
     }
-}
-
-void on_vehicle_disconnected(){
-    if((sleep_timer_enabled_flags & SLEEP_TIMER_DISCONNECTED_FLAG) == SLEEP_TIMER_DISCONNECTED_FLAG){
-        goToSleep = millis() + sleep_timer_disconnected * 1000;
-        counting = true;
+    else if(evseState >= OPENEVSE_STATE_CONNECTED && state == OPENEVSE_STATE_NOT_CONNECTED){
+        if((sleep_timer_enabled_flags & SLEEP_TIMER_DISCONNECTED_FLAG) == SLEEP_TIMER_DISCONNECTED_FLAG){
+            DEBUG.println("Disconnected");
+            setTimer(sleep_timer_disconnected);
+        }
     }
+
+    evseState = state;
 }
 
-void sleep_timer_display_updates(bool enabled){
+void SleepTimer::sleep_timer_display_updates(bool enabled){
     displayUpdates = enabled;
 }
+
+SleepTimer sleepTimer;
