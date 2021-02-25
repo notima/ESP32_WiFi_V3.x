@@ -16,6 +16,10 @@ class LcdManager : MicroTasks::Task{
         InfoPage evsePage;
         InfoPage pages[4] = {evsePage, evsePage, evsePage, evsePage};
         Lcd *lcd;
+        boolean flipBookEnabled = true;
+        int updateInterval = 1000;
+        std::function<void(Lcd *lcd)> onScreenUpdate = [](Lcd *lcd){};
+        unsigned long releaseTime = ULONG_MAX;
 
     protected:
         void setup();
@@ -33,9 +37,11 @@ class LcdManager : MicroTasks::Task{
         LcdManager();
         void begin();
         void addInfoPage(uint8_t index, std::function<void(Lcd *lcd)> onScreenUpdate, uint16_t  updateInterval = 1000);
-        void claim(std::function<void(Lcd *lcd)> onScreenUpdate, uint16_t updateInterval = 1000);
+        void claim(std::function<void(Lcd *lcd)> onScreenUpdate, int updateInterval = 1000);
         void release();
+        void display(String message, uint8_t x, uint8_t y, int time, boolean clearLine = true);
         void clearPages();
+        void enableFlipBook(boolean enabled);
 };
 
 extern LcdManager lcdManager;
