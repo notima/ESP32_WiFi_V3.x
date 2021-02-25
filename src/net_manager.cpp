@@ -4,6 +4,7 @@
 #include "lcd.h"
 #include "espal.h"
 #include "time_man.h"
+#include "lcd_manager.h"
 
 #include "LedManagerTask.h"
 
@@ -139,11 +140,11 @@ static void net_wifi_start()
 
 static void display_state()
 {
-  lcd_display(F("Hostname:"), 0, 0, 0, LCD_CLEAR_LINE);
-  lcd_display(esp_hostname.c_str(), 0, 1, 5000, LCD_CLEAR_LINE);
+  lcdManager.display(F("Hostname:"), 0, 0, 0);
+  lcdManager.display(esp_hostname.c_str(), 0, 1, 5000);
 
-  lcd_display(F("IP Address:"), 0, 0, 0, LCD_CLEAR_LINE);
-  lcd_display(ipaddress.c_str(), 0, 1, 5000, LCD_CLEAR_LINE);
+  lcdManager.display(F("IP Address:"), 0, 0, 0);
+  lcdManager.display(ipaddress.c_str(), 0, 1, 5000);
 }
 
 static void net_connected(IPAddress myAddress)
@@ -220,8 +221,8 @@ static void net_wifi_onStationModeDisconnected(const WiFiEventStationModeDisconn
 }
 
 static void net_wifi_onAPModeStationConnected(const WiFiEventSoftAPModeStationConnected &event) {
-  lcd_display(F("IP Address"), 0, 0, 0, LCD_CLEAR_LINE);
-  lcd_display(ipaddress, 0, 1, (0 == apClients ? 15 : 5) * 1000, LCD_CLEAR_LINE);
+  lcdManager.display(F("IP Address"), 0, 0, 0);
+  lcdManager.display(ipaddress, 0, 1, (0 == apClients ? 15 : 5) * 1000);
 
   ledManager.setWifiMode(false, true);
 

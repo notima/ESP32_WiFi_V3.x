@@ -7,7 +7,7 @@
 
 #include "lcd.h"
 #include "app_config.h"
-#include "sleep_timer.h"
+#include "lcd_manager.h"
 
 static int lastPercent = -1;
 
@@ -21,10 +21,10 @@ void ota_setup()
     // Clean SPIFFS
     //SPIFFS.end();
     DBUGF("Starting ArduinoOTA update");
-    sleepTimer.sleep_timer_display_updates(false);
-    lcd_display(F("Updating WiFi"), 0, 0, 0, LCD_CLEAR_LINE);
-    lcd_display(F(""), 0, 1, 10 * 1000, LCD_CLEAR_LINE);
-    lcd_loop();
+    lcdManager.claim([](LcdManager::Lcd *lcd){
+      lcd->display(F("Updating WiFi"), 0, 0);
+      lcd->display(F(""), 0, 1);
+    }, 100);
   });
 
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
@@ -32,8 +32,10 @@ void ota_setup()
     if (percent != lastPercent)
     {
       DBUGF("ArduinoOTA progress %d%%", percent);
-      String text = String(percent) + F("%");
-      lcd_display(text, 0, 1, 10 * 1000, LCD_DISPLAY_NOW);
+      lcdManager.claim([percent](LcdManager::Lcd *lcd){
+        String text = String(percent) + F("%");
+        lcd->display(text, 0, 1);
+      }, 100);
       lastPercent = percent;
       feedLoopWDT();
     }
@@ -50,7 +52,6 @@ void ota_setup()
     text += error;
     text += F("]");
     lcd_display(text, 0, 1, 5 * 1000, LCD_CLEAR_LINE | LCD_DISPLAY_NOW);
-    sleepTimer.sleep_timer_display_updates(true);
   });
 }
 

@@ -4,7 +4,7 @@
 #include "input.h"
 #include "openevse.h"
 #include "mqtt.h"
-#include "lcd.h"
+#include "lcd_manager.h"
 #include "sleep_timer.h"
 
 #define RAPI_GET_STATE "/rapi/in/$GS"
@@ -12,8 +12,8 @@
 
 #define MQTT_TIMEOUT 10000
 
-#define MQTT_TIMEOUT_MSG "        Unable to determine a safe current level. "
-#define WAITING_FOR_CURRENT_MSG "        Waiting for current to be available. "
+#define MQTT_TIMEOUT_MSG "     Unable to determine a safe current level. "
+#define WAITING_FOR_CURRENT_MSG "     Waiting for current to be available. "
 
 #define LOAD_BALANCER_STATUS_IDLE 0
 #define LOAD_BALANCER_STATUS_WAKING 1
@@ -85,8 +85,8 @@ void LoadBalancer::safetyCheck(std::function<void(boolean)> onSafe){
 }
 
 void showWaitIndicator(){
-    lcd_display("Please wait...", 0, 0, 0, LCD_CLEAR_LINE);
-    lcd_display("", 0, 1, 3100, LCD_CLEAR_LINE);
+    lcdManager.display("Please wait...", 0, 0, 1);
+    lcdManager.display("", 0, 1, 3100);
     rapiSender.sendCmd(F("$FB 6"));
 }
 
@@ -100,6 +100,11 @@ unsigned long LoadBalancer::loop(MicroTasks::WakeReason reason){
             showWaitIndicator();
             if(safe_current_level == 0){
                 status = LOAD_BALANCER_STATUS_WAITING;
+                msgRoll = 0;
+                lcdManager.claim([this](LcdManager::Lcd * lcd){
+                    lcd->display("Not charging", 0, 0);
+                    lcd->display(WAITING_FOR_CURRENT_MSG + (msgRoll++ % strlen(WAITING_FOR_CURRENT_MSG)), 0, 1, false);
+                }, 500);
                 break;
             }
             safetyCheck([this](boolean otherAwake){
@@ -107,7 +112,6 @@ unsigned long LoadBalancer::loop(MicroTasks::WakeReason reason){
                 currentStr.concat(safe_current_level);
                 sendCommand(load_balancing_topics + RAPI_SET_CURRENT, currentStr, [this](boolean ok, String result){
                     if(ok){
-                        sleepTimer.sleep_timer_display_updates(true);
                         rapiSender.sendCmd(F("$FE"));
                     }
                     status = LOAD_BALANCER_STATUS_IDLE;
@@ -120,18 +124,23 @@ unsigned long LoadBalancer::loop(MicroTasks::WakeReason reason){
             char msg[50];
             sprintf(msg, "Safety check timed out! %s might be offline.", load_balancing_topics.c_str());
             mqtt_log_error(msg);
-            sleepTimer.sleep_timer_display_updates(true);
+            msgRoll = 0;
+            lcdManager.claim([this](LcdManager::Lcd *lcd){
+                lcd->display("Out of order", 0, 0);
+                lcd->display(MQTT_TIMEOUT_MSG + (msgRoll++ % strlen(MQTT_TIMEOUT_MSG)), 0, 1);
+                if(msgRoll >= strlen(MQTT_TIMEOUT_MSG) * 2){
+                    status = LOAD_BALANCER_STATUS_IDLE;
+                    lcdManager.release();
+                }
+            }, 500);
         }
         break;
 
     case LOAD_BALANCER_STATUS_WAITING:
-        lcd_display("Not charging", 0, 0, 0, LCD_CLEAR_LINE);
-        for(uint8_t i = 0; i < 2; i++)
-            lcd_display(WAITING_FOR_CURRENT_MSG + (msgRoll++ % strlen(WAITING_FOR_CURRENT_MSG)), 0, 1, 500, LCD_CLEAR_LINE);
         rapiSender.sendCmd(F("$FB 6"));
         safetyCheck([this](boolean otherAwake){
             if(!otherAwake){
-                sleepTimer.sleep_timer_display_updates(true);
+                lcdManager.release();
                 rapiSender.sendCmd(F("$FE"));
                 status = LOAD_BALANCER_STATUS_IDLE;
             }
@@ -139,19 +148,10 @@ unsigned long LoadBalancer::loop(MicroTasks::WakeReason reason){
         break;
     
     case LOAD_BALANCER_STATUS_TIMEOUT:
-        sleepTimer.sleep_timer_display_updates(false);
         safetyCheck([this](boolean otherAwake){
             status = LOAD_BALANCER_STATUS_IDLE;
-            sleepTimer.sleep_timer_display_updates(true);
         });
         rapiSender.sendCmd(F("$FB 1"));
-        lcd_display("Out of order", 0, 0, 0, LCD_CLEAR_LINE);
-        for(uint8_t i = 0; i < 2; i++)
-            lcd_display(MQTT_TIMEOUT_MSG + (msgRoll++ % strlen(MQTT_TIMEOUT_MSG)), 0, 1, 500, LCD_CLEAR_LINE);
-        if(msgRoll >= strlen(MQTT_TIMEOUT_MSG) * 2){
-            status = LOAD_BALANCER_STATUS_IDLE;
-            sleepTimer.sleep_timer_display_updates(true);
-        }
         break;
         
     case LOAD_BALANCER_STATUS_IDLE:
@@ -162,7 +162,6 @@ unsigned long LoadBalancer::loop(MicroTasks::WakeReason reason){
 }
 
 void LoadBalancer::wakeup(){
-    sleepTimer.sleep_timer_display_updates(false);
     status = LOAD_BALANCER_STATUS_WAKING;
     DEBUG.println("Waking up");
     wakeupStarted = millis() + MQTT_TIMEOUT;

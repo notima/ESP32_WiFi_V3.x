@@ -12,7 +12,6 @@ class SleepTimer : MicroTasks::Task {
         uint8_t evseState;
         unsigned long goToSleep = 0;
         bool counting = true;
-        bool displayUpdates = true;
 
     protected:
         void setup();
@@ -25,12 +24,6 @@ class SleepTimer : MicroTasks::Task {
         SleepTimer();
         void begin();
         void onStateChange(uint8_t state);
-        // -------------------------------------------------------------------
-        // Enable/disable display updates
-        // When enabled, the timer loop will display timer information
-        // on the lcd regularly.
-        // -------------------------------------------------------------------
-        void sleep_timer_display_updates(bool enabled);
 };
 
 extern SleepTimer sleepTimer;

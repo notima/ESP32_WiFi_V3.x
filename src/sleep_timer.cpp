@@ -110,8 +110,4 @@ void SleepTimer::onStateChange(uint8_t state){
     evseState = state;
 }
 
-void SleepTimer::sleep_timer_display_updates(bool enabled){
-    displayUpdates = enabled;
-}
-
 SleepTimer sleepTimer;
