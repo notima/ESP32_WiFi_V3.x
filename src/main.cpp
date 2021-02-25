@@ -114,6 +114,8 @@ void setup()
 
   loadBalancer.begin();
   sleepTimer.begin();
+  lcdManager.begin();
+  rfid.begin();
 
 #ifdef ENABLE_OTA
   ota_setup();
@@ -121,11 +123,9 @@ void setup()
 #endif
 
   input_setup();
-  //rfid_setup();
-  lcdManager.begin();
 
-  lcd_display(F("OpenEVSE WiFI"), 0, 0, 0, LCD_CLEAR_LINE);
-  lcd_display(currentfirmware, 0, 1, 5 * 1000, LCD_CLEAR_LINE);
+  lcdManager.display("OpenEVSE WiFI", 0, 0, 0);
+  lcdManager.display(currentfirmware, 0, 1, 5 * 1000);
 
   start_mem = last_mem = ESPAL.getFreeHeap();
 } // end setup
@@ -150,7 +150,6 @@ loop() {
   rapiSender.loop();
   divert_current_loop();
   time_loop();
-  rfid_loop();
 
   MicroTask.update();
 
@@ -185,7 +184,7 @@ loop() {
           DEBUG.printf("%s: Free memory %u - diff %d %d\n", time_format_time(time(NULL)).c_str(), current, diff, start_mem - current);
           last_mem = current;
         }
-        rfid_setup();
+        rfid.wakeup();
         Timer4 = millis();
       }
     }

@@ -762,7 +762,7 @@ void handleAddRFID(MongooseHttpServerRequest *request) {
   response->setContentType(CONTENT_TYPE_TEXT);
   response->addHeader("Access-Control-Allow-Origin", "*");
   request->send(response);
-  rfid_wait_for_tag(60);
+  rfid.waitForTag(60);
 }
 
 void handlePollRFID(MongooseHttpServerRequest *request) {
@@ -773,7 +773,7 @@ void handlePollRFID(MongooseHttpServerRequest *request) {
   response->setCode(200);
   response->setContentType(CONTENT_TYPE_JSON);
   response->addHeader("Access-Control-Allow-Origin", "*");
-  serializeJson(rfid_poll(), *response);
+  serializeJson(rfid.rfidPoll(), *response);
   request->send(response);
 }
 

@@ -1,65 +1,45 @@
-#define STATUS_NOT_ENABLED 0
-#define STATUS_NOT_FOUND 1
-#define STATUS_ACTIVE 2
-
 #include "rfid.h"
 
 #include "debug.h"
 #include "mqtt.h"
-#include "lcd.h"
 #include "app_config.h"
-#include "RapiSender.h"
 #include "input.h"
 #include "openevse.h"
-#include "sleep_timer.h"
-#include "Wire.h"
+#include "lcd_manager.h"
 #include "load_balancer.h"
 
-#ifndef I2C_SDA
-#define I2C_SDA 21
-#endif
-
-#ifndef I2C_SCL
-#define I2C_SCL 22
-#endif
-
-DFRobot_PN532_IIC  nfc(PN532_IRQ, PN532_POLLING); 
-struct card NFCcard;
-extern RapiSender rapiSender;
-
-uint8_t status = STATUS_NOT_ENABLED;
-boolean hasContact = false;
-
-unsigned long nextScan = 0;
-
-// How many more seconds to wait for tag
-uint8_t waitingForTag = 0;
-unsigned long stopWaiting = 0;
-boolean cardFound = false;
-
-
-
-void rfid_setup(){
-    if(!config_rfid_enabled()){
-        status = STATUS_NOT_ENABLED;
-        return;
-    }
-
-    Wire.begin(I2C_SDA, I2C_SCL);
-    if(nfc.begin()){
-        status = STATUS_ACTIVE;
-    }else{
-        if(status == STATUS_NOT_FOUND){
-            config_save_rfid(false, rfid_storage);
-            mqtt_log_error("RFID still not responding and has been disabled.");
-        }else{
-            mqtt_log_error("RFID module did not respond!");
-            status = STATUS_NOT_FOUND;
-        }
-    }
+RfidTask::RfidTask() :
+  MicroTasks::Task(),
+  nfc(PN532_IRQ, PN532_POLLING)
+{
 }
 
-String getUidHex(card NFCcard){
+void RfidTask::begin(){
+    MicroTask.startTask(this);
+}
+
+void RfidTask::setup(){
+
+    if(!config_rfid_enabled()){
+        status = RFID_STATUS_NOT_ENABLED;
+        return;
+    }
+    
+    wakeup();
+}
+
+boolean RfidTask::wakeup(){
+    boolean awake = nfc.begin();
+    if(awake){
+        status = RFID_STATUS_ACTIVE;
+    }else{
+        DEBUG.println("RFID module did not respond!");
+        status = RFID_STATUS_NOT_FOUND;
+    }
+    return awake;
+}
+
+String RfidTask::getUidHex(card NFCcard){
     String uidHex = "";
     for(int i = 0; i < NFCcard.uidlenght; i++){
         char hex[NFCcard.uidlenght * 3];
@@ -70,16 +50,15 @@ String getUidHex(card NFCcard){
     return uidHex;
 }
 
-void scanCard(){
+void RfidTask::scanCard(){
     NFCcard = nfc.getInformation();
-    String uidHex = getUidHex(NFCcard);
+    String uidHex = getUidHex(nfc.getInformation());
 
     if(waitingForTag > 0){
         waitingForTag = 0;
         cardFound = true;
-        lcd_display("Tag detected!", 0, 0, 0, LCD_CLEAR_LINE);
-        lcd_display(uidHex, 0, 1, 3000, LCD_CLEAR_LINE);
-        sleepTimer.sleep_timer_display_updates(true);
+        lcdManager.display("Tag detected!", 0, 0, 3000);
+        lcdManager.display(uidHex, 0, 1, 3000);
     }else{
         // Check if tag is stored locally
         char storedTags[rfid_storage.length() + 1];
@@ -91,12 +70,10 @@ void scanCard(){
             storedTagStr.trim();
             uidHex.trim();
             if(storedTagStr.compareTo(uidHex) == 0){
-                lcd_release();
-                if(config_load_balancing_enabled())
+                if(config_load_balancing_enabled()){
                     loadBalancer.wakeup();
-                else{
+                }else{
                     rapiSender.sendCmd(F("$FE"));
-                    sleepTimer.sleep_timer_display_updates(true);
                 }
                 break;
             }
@@ -110,63 +87,66 @@ void scanCard(){
     }
 }
 
-void rfid_loop(){
+unsigned long RfidTask::loop(MicroTasks::WakeReason reason){
+    unsigned long nextScan = SCAN_FREQ;
+
     if(!config_rfid_enabled()){
-        if(status != STATUS_NOT_FOUND)
-            status = STATUS_NOT_ENABLED;
-        return;
+        if(status != RFID_STATUS_NOT_FOUND)
+            status = RFID_STATUS_NOT_ENABLED;
+        return MicroTask.WaitForMask;
     }
 
-    if(millis() < nextScan){
-        return;
+    if(state != evseState){
+        if(state >= OPENEVSE_STATE_SLEEPING){
+            std::function<void(LcdManager::Lcd *lcd)> displayUpdate = [](LcdManager::Lcd *lcd){
+                lcd->display("Scan RFID tag", 0, 0);
+                lcd->display("to start", 0, 1);
+            };
+            lcdManager.addInfoPage(0, displayUpdate);
+            lcdManager.addInfoPage(1, displayUpdate);
+        }
+        evseState = state;
     }
-
-    if(status != STATUS_ACTIVE){
-        rfid_setup();
-        return;
-    }
-
-    if(waitingForTag > 0){
-        waitingForTag = (stopWaiting - millis()) / 1000;
-        String msg = "tag... ";
-        msg.concat(waitingForTag);
-        lcd_display("Waiting for RFID", 0, 0, 0, LCD_CLEAR_LINE);
-        lcd_display(msg, 0, 1, 1000, LCD_CLEAR_LINE);
-        if(waitingForTag < 1)
-            sleepTimer.sleep_timer_display_updates(true);
-    }
-
-    nextScan = millis() + SCAN_FREQ;
-
+    
     boolean foundCard = (state >= OPENEVSE_STATE_SLEEPING || waitingForTag) && nfc.scan();
 
     if(foundCard && !hasContact){
         scanCard();
         hasContact = true;
-        return;
+        return nextScan;
     }
 
     if(!foundCard && hasContact){
         hasContact = false;
     }
+
+    return nextScan;
 }
 
-uint8_t rfid_status(){
+uint8_t RfidTask::getStatus(){
     return status;
 }
 
-void rfid_wait_for_tag(uint8_t seconds){
+void RfidTask::waitForTag(uint8_t seconds){
     if(!config_rfid_enabled())
         return;
-    sleepTimer.sleep_timer_display_updates(false);
-    lcd_release();
     waitingForTag = seconds;
     stopWaiting = millis() + seconds * 1000;
     cardFound = false;
-    lcd_display("Waiting for RFID", 0, 0, seconds * 1000, LCD_CLEAR_LINE);
+    lcdManager.claim([this](LcdManager::Lcd *lcd){
+        if(waitingForTag <= 0){
+            lcdManager.release();
+            return;
+        }
+        waitingForTag = (stopWaiting - millis()) / 1000;
+        String msg = "tag... ";
+        msg.concat(waitingForTag);
+        lcd->display("Waiting for RFID", 0, 0);
+        lcd->display(msg, 0, 1);
+    }, 500);
 }
 
-DynamicJsonDocument rfid_poll() {
+DynamicJsonDocument RfidTask::rfidPoll() {
     const size_t capacity = JSON_ARRAY_SIZE(3);
     DynamicJsonDocument doc(capacity);
     if(waitingForTag > 0){
@@ -177,7 +157,7 @@ DynamicJsonDocument rfid_poll() {
     else if(cardFound){
         // respond with the scanned tags uid and reset
         doc["status"] = "done";
-        doc["scanned"] = getUidHex(NFCcard);
+        doc["scanned"] = getUidHex(nfc.getInformation());
         cardFound = false;
     }
     else  {
@@ -185,3 +165,5 @@ DynamicJsonDocument rfid_poll() {
     }
     return doc;
 }
+
+RfidTask rfid;
