@@ -52,6 +52,7 @@
 #include "rfid.h"
 #include "sleep_timer.h"
 #include "load_balancer.h"
+#include "lcd_manager.h"
 
 #include "LedManagerTask.h"
 
@@ -111,7 +112,6 @@ void setup()
 
   DBUGF("After web_server_setup: %d", ESPAL.getFreeHeap());
 
-  rfid_setup();
   loadBalancer.begin();
   sleepTimer.begin();
 
@@ -121,7 +121,8 @@ void setup()
 #endif
 
   input_setup();
-  rfid_setup();
+  //rfid_setup();
+  lcdManager.begin();
 
   lcd_display(F("OpenEVSE WiFI"), 0, 0, 0, LCD_CLEAR_LINE);
   lcd_display(currentfirmware, 0, 1, 5 * 1000, LCD_CLEAR_LINE);
@@ -140,7 +141,7 @@ loop() {
   Mongoose.poll(0);
   Profile_End(Mongoose, 10);
 
-  lcd_loop();
+  //lcd_loop();
   web_server_loop();
   net_loop();
 #ifdef ENABLE_OTA
