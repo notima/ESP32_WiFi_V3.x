@@ -13,7 +13,7 @@
 #define MQTT_TIMEOUT 10000
 
 #define MQTT_TIMEOUT_MSG "     Unable to determine a safe current level. "
-#define WAITING_FOR_CURRENT_MSG "     Waiting for current to be available. "
+#define WAITING_FOR_CURRENT_MSG "     Charging will start when current is available. "
 
 #define LOAD_BALANCER_STATUS_IDLE 0
 #define LOAD_BALANCER_STATUS_WAKING 1
