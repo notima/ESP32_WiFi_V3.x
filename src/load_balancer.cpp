@@ -11,6 +11,7 @@
 #define RAPI_SET_CURRENT "/rapi/in/$SC"
 
 #define MQTT_TIMEOUT 10000
+#define START_DELAY 10000
 
 #define MQTT_TIMEOUT_MSG "     Unable to determine a safe current level. "
 #define WAITING_FOR_CURRENT_MSG "     Charging will start when current is available. "
@@ -19,11 +20,7 @@
 #define LOAD_BALANCER_STATUS_WAKING 1
 #define LOAD_BALANCER_STATUS_WAITING 2
 #define LOAD_BALANCER_STATUS_TIMEOUT 3
-
-unsigned long wakeupStarted = 0;
-
-
-String lastCommand = "";
+#define LOAD_BALANCER_STATUS_STARTING 4
 
 LoadBalancer::LoadBalancer() :
   MicroTasks::Task() {
@@ -93,7 +90,7 @@ void showWaitIndicator(){
 uint8_t msgRoll = 0;
 unsigned long LoadBalancer::loop(MicroTasks::WakeReason reason){
     if(!config_load_balancing_enabled())
-        return 10000;
+        return 5000;
     switch (status) {
     case LOAD_BALANCER_STATUS_WAKING:
         if(wakeupStarted - millis() < MQTT_TIMEOUT){
@@ -110,11 +107,16 @@ unsigned long LoadBalancer::loop(MicroTasks::WakeReason reason){
             safetyCheck([this](boolean otherAwake){
                 String currentStr = "";
                 currentStr.concat(safe_current_level);
-                sendCommand(load_balancing_topics + RAPI_SET_CURRENT, currentStr, [this](boolean ok, String result){
+                sendCommand(load_balancing_topics + RAPI_SET_CURRENT, currentStr, [this, otherAwake](boolean ok, String result){
                     if(ok){
-                        rapiSender.sendCmd(F("$FE"));
+                        status = LOAD_BALANCER_STATUS_STARTING;
+                        lcdManager.display("Starting", 0, 1, START_DELAY + 2000);
+                        startTime = millis() + (START_DELAY * otherAwake);
+                        DEBUG.print("OTHER AWAKE?: ");
+                        DEBUG.println(otherAwake);
+                    }else{
+                        status = LOAD_BALANCER_STATUS_IDLE;
                     }
-                    status = LOAD_BALANCER_STATUS_IDLE;
                 });
             });
         }else{
@@ -133,6 +135,13 @@ unsigned long LoadBalancer::loop(MicroTasks::WakeReason reason){
                     lcdManager.release();
                 }
             }, 500);
+        }
+        break;
+
+    case LOAD_BALANCER_STATUS_STARTING:
+        if(millis() > startTime){
+            rapiSender.sendCmd(F("$FE"));
+            status = LOAD_BALANCER_STATUS_IDLE;
         }
         break;
 

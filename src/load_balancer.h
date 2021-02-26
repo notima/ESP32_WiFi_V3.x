@@ -7,6 +7,9 @@ class LoadBalancer : public MicroTasks::Task {
     private:
         uint8_t status;
         std::function<void(boolean, String)> rapi_callback = [](boolean ok, String result){};
+        unsigned long wakeupStarted = 0;
+        unsigned long startTime = 0;
+        String lastCommand = "";
 
     protected:
         void setup();
