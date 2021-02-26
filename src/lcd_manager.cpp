@@ -73,7 +73,6 @@ unsigned long LcdManager::loop(MicroTasks::WakeReason reason) {
         uint8_t currentPage = millis() / TIME_PER_PAGE / 1000 % LCD_INFO_PAGES;
         onScreenUpdate = pages[currentPage].onUpdate;
         updateInterval = pages[currentPage].updateInterval;
-        DEBUG.printf("Page %d\n", currentPage);
     }
     onScreenUpdate(lcd);
     return max(updateInterval, 100);
