@@ -34,25 +34,15 @@ boolean RfidTask::wakeup(){
         status = RFID_STATUS_ACTIVE;
     }else{
         DEBUG.println("RFID module did not respond!");
+        mqtt_log_error("RFID module did not respond!");
         status = RFID_STATUS_NOT_FOUND;
     }
     return awake;
 }
 
-String RfidTask::getUidHex(card NFCcard){
-    String uidHex = "";
-    for(int i = 0; i < NFCcard.uidlenght; i++){
-        char hex[NFCcard.uidlenght * 3];
-        sprintf(hex,"%x",NFCcard.uid[i]);
-        uidHex = uidHex + hex + " ";
-    }
-    uidHex.trim();
-    return uidHex;
-}
-
 void RfidTask::scanCard(){
     NFCcard = nfc.getInformation();
-    String uidHex = getUidHex(nfc.getInformation());
+    String uidHex = nfc.readUid();
 
     if(waitingForTag > 0){
         waitingForTag = 0;
@@ -67,7 +57,7 @@ void RfidTask::scanCard(){
         while(storedTag)
         {
             String storedTagStr = storedTag;
-            storedTagStr.trim();
+            storedTagStr.replace(" ", "");
             uidHex.trim();
             if(storedTagStr.compareTo(uidHex) == 0){
                 if(config_load_balancing_enabled()){
@@ -147,7 +137,7 @@ void RfidTask::waitForTag(uint8_t seconds){
 }
 
 DynamicJsonDocument RfidTask::rfidPoll() {
-    const size_t capacity = JSON_ARRAY_SIZE(3);
+    const size_t capacity = JSON_ARRAY_SIZE(4);
     DynamicJsonDocument doc(capacity);
     if(waitingForTag > 0){
         // respond with remainding time
@@ -157,7 +147,7 @@ DynamicJsonDocument RfidTask::rfidPoll() {
     else if(cardFound){
         // respond with the scanned tags uid and reset
         doc["status"] = "done";
-        doc["scanned"] = getUidHex(nfc.getInformation());
+        doc["scanned"] = nfc.readUid();
         cardFound = false;
     }
     else  {

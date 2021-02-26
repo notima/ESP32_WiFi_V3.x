@@ -26,8 +26,6 @@ class RfidTask : public MicroTasks::Task {
         void setup();
         unsigned long loop(MicroTasks::WakeReason reason);
         struct card NFCcard;
-        // TODO: remove and use nfc.readUID() instead
-        String getUidHex(card NFCcard);
         void scanCard();
 
     public:
