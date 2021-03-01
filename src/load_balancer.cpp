@@ -112,7 +112,7 @@ unsigned long LoadBalancer::loop(MicroTasks::WakeReason reason){
 
     switch (status) {
     case LOAD_BALANCER_STATUS_WAKING:
-        if(wakeupStarted - millis() < MQTT_TIMEOUT){
+        if(timeout - millis() < MQTT_TIMEOUT){
             showWaitIndicator();
             if(safe_current_level == 0){
                 status = LOAD_BALANCER_STATUS_WAITING;
@@ -192,7 +192,7 @@ unsigned long LoadBalancer::loop(MicroTasks::WakeReason reason){
 void LoadBalancer::wakeup(){
     status = LOAD_BALANCER_STATUS_WAKING;
     DEBUG.println("Waking up");
-    wakeupStarted = millis() + MQTT_TIMEOUT;
+    timeout = millis() + MQTT_TIMEOUT;
     showWaitIndicator();
 }
 

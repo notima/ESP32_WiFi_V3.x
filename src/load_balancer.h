@@ -7,9 +7,13 @@ class LoadBalancer : public MicroTasks::Task {
     private:
         uint8_t status;
         std::function<void(boolean, String)> rapi_callback = [](boolean ok, String result){};
-        unsigned long wakeupStarted = 0;
+        // At what time will we stop waiting for response from other station?
+        unsigned long timeout = 0;
+        // At what time will the station start?
         unsigned long startTime = 0;
+        // At what time is it safe to increase max current
         unsigned long safeTime = 0;
+        // Current max current
         uint8_t current;
         String lastCommand = "";
 
