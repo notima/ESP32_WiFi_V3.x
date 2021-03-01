@@ -9,6 +9,8 @@ class LoadBalancer : public MicroTasks::Task {
         std::function<void(boolean, String)> rapi_callback = [](boolean ok, String result){};
         unsigned long wakeupStarted = 0;
         unsigned long startTime = 0;
+        unsigned long safeTime = 0;
+        uint8_t current;
         String lastCommand = "";
 
     protected:
@@ -17,6 +19,7 @@ class LoadBalancer : public MicroTasks::Task {
 
         void sendCommand(String topic, String command, std::function<void(boolean, String)> callback);
         void setCurrent(int current, std::function<void()> onSuccess);
+        void updateCurrent();
         void safetyCheck(std::function<void(boolean)> onSafe);
 
     public:

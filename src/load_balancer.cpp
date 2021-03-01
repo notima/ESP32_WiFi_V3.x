@@ -61,23 +61,39 @@ String getToken(String string, int index){
     return token;
 }
 
+void LoadBalancer::updateCurrent(){
+    if(rapiSender.sendCmdSync("$GE") == 0) {
+        uint8_t newCurrent = String(rapiSender.getToken(1)).toInt();
+        if(newCurrent != current){
+            safeTime = millis() + START_DELAY + 1000;
+        }
+        current = newCurrent;
+    }
+}
+
 void LoadBalancer::safetyCheck(std::function<void(boolean)> onSafe){
     sendCommand(load_balancing_topics + RAPI_GET_STATE, "", [this, onSafe](boolean ok, String result){
         if(!ok)
             return;
         uint8_t state = atoi(getToken(result, 1).c_str());
-        uint8_t current;
+        uint8_t newCurrent = current;
         boolean otherAwake;
         if(state >= OPENEVSE_STATE_SLEEPING){
-            current = total_current;
+            if(millis() > safeTime){
+                newCurrent = total_current;
+            }
             otherAwake = false;
         }else{
-            current = safe_current_level;
+            newCurrent = safe_current_level;
             otherAwake = true;
         }
-        setCurrent(current, [onSafe, otherAwake](){
+        if(newCurrent != current){
+            setCurrent(newCurrent, [onSafe, otherAwake](){
+                onSafe(otherAwake);
+            });
+        }else{
             onSafe(otherAwake);
-        });
+        }
     });
 }
 
@@ -91,6 +107,9 @@ uint8_t msgRoll = 0;
 unsigned long LoadBalancer::loop(MicroTasks::WakeReason reason){
     if(!config_load_balancing_enabled())
         return 5000;
+
+    updateCurrent();
+
     switch (status) {
     case LOAD_BALANCER_STATUS_WAKING:
         if(wakeupStarted - millis() < MQTT_TIMEOUT){
