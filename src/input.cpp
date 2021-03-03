@@ -64,13 +64,11 @@ class InputTask : public MicroTasks::Task
 
       if(_evseState.IsTriggered())
       {
-        uint8_t state = evse.getEvseState();
-        ledManager.setEvseState(state);
-
         // Send to all clients
         StaticJsonDocument<32> event;
-        event["state"] = state;
-        event["vehicle"] = evse.isVehicleConnected();
+        event["state"] = evse.getEvseState();
+        event["vehicle"] = evse.isVehicleConnected() ? 1 : 0;
+        event["colour"] = evse.getStateColour();
         event_send(event);
       }
 
@@ -120,7 +118,8 @@ void create_rapi_json(JsonDocument &doc)
   }
 #endif
   doc["state"] = evse.getEvseState();
-  doc["vehicle"] = evse.isVehicleConnected();
+  doc["vehicle"] = evse.isVehicleConnected() ? 1 : 0;
+  doc["colour"] = evse.getStateColour();
   doc["freeram"] = ESPAL.getFreeHeap();
   doc["divertmode"] = divertmode;
   doc["srssi"] = WiFi.RSSI();

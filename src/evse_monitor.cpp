@@ -61,11 +61,13 @@
 #define EVSE_MONITOR_FAULT_COUNT_BOOT_READY   (1 << 0)
 #define EVSE_MONITOR_FLAGS_BOOT_READY         (1 << 1)
 #define EVSE_MONITOR_CURRENT_BOOT_READY       (1 << 2)
+#define EVSE_MONITOR_ENERGY_BOOT_READY        (1 << 3)
 
-#define EVSE_MONITOR_BOOT_READY (\
+#define EVSE_MONITOR_BOOT_READY ( \
         EVSE_MONITOR_FAULT_COUNT_BOOT_READY | \
         EVSE_MONITOR_FLAGS_BOOT_READY | \
-        EVSE_MONITOR_CURRENT_BOOT_READY \
+        EVSE_MONITOR_CURRENT_BOOT_READY | \
+        EVSE_MONITOR_ENERGY_BOOT_READY \
 )
 
 EvseMonitor::EvseStateEvent::EvseStateEvent() :
@@ -200,6 +202,17 @@ void EvseMonitor::evseBoot(const char *firmware)
     }
   });
 
+  _openevse.getEnergy([this](int ret, double session_wh, double total_kwh)
+  {
+    if(RAPI_RESPONSE_OK == ret)
+    {
+      DBUGF("session_wh = %.2f, total_kwh = %.2f", session_wh, total_kwh);
+      _total_kwh = total_kwh;
+
+      _boot_ready.ready(EVSE_MONITOR_ENERGY_BOOT_READY);
+    }
+  });
+
   _openevse.heartbeatEnable(EVSE_HEATBEAT_INTERVAL, EVSE_HEARTBEAT_CURRENT, [this](int ret, int interval, int current, int triggered) {
     _heartbeat = RAPI_RESPONSE_OK == ret;
   });
@@ -257,27 +270,32 @@ unsigned long EvseMonitor::loop(MicroTasks::WakeReason reason)
     });
   }
 
-  if(_state.isCharging() && 0 == _count % EVSE_MONITOR_AMP_AND_VOLT_TIME)
+  if(0 == _count % EVSE_MONITOR_AMP_AND_VOLT_TIME)
   {
-    DBUGLN("Get charge current/voltage status");
-    OpenEVSE.getChargeCurrentAndVoltage([this](int ret, double a, double volts)
+    if(_state.isCharging())
     {
-      if(RAPI_RESPONSE_OK == ret)
+      DBUGLN("Get charge current/voltage status");
+      _openevse.getChargeCurrentAndVoltage([this](int ret, double a, double volts)
       {
-        DBUGF("amps = %.2f, volts = %.2f", a, volts);
-        _amp = a;
-        if(volts >= 0) {
-          _voltage = volts;
+        if(RAPI_RESPONSE_OK == ret)
+        {
+          DBUGF("amps = %.2f, volts = %.2f", a, volts);
+          _amp = a;
+          if(volts >= 0) {
+            _voltage = volts;
+          }
+          _data_ready.ready(EVSE_MONITOR_AMP_AND_VOLT_DATA_READY);
         }
-        _data_ready.ready(EVSE_MONITOR_AMP_AND_VOLT_DATA_READY);
-      }
-    });
+      });
+    } else {
+      _data_ready.ready(EVSE_MONITOR_AMP_AND_VOLT_DATA_READY);
+    }
   }
 
   if(0 == _count % EVSE_MONITOR_TEMP_TIME)
   {
     DBUGLN("Get tempurature status");
-    OpenEVSE.getTemperature([this](int ret, double t1, bool t1_valid, double t2, bool t2_valid, double t3, bool t3_valid)
+    _openevse.getTemperature([this](int ret, double t1, bool t1_valid, double t2, bool t2_valid, double t3, bool t3_valid)
     {
       if(RAPI_RESPONSE_OK == ret)
       {
@@ -306,20 +324,25 @@ unsigned long EvseMonitor::loop(MicroTasks::WakeReason reason)
     });
   }
 
-  if(_state.isCharging() && 0 == _count % EVSE_MONITOR_ENERGY_TIME)
+  if(0 == _count % EVSE_MONITOR_ENERGY_TIME)
   {
-    DBUGLN("Get charge energy usage");
-    OpenEVSE.getEnergy([this](int ret, double session_wh, double total_kwh)
+    if(_state.isCharging())
     {
-      if(RAPI_RESPONSE_OK == ret)
+      DBUGLN("Get charge energy usage");
+      _openevse.getEnergy([this](int ret, double session_wh, double total_kwh)
       {
-        DBUGF("session_wh = %.2f, total_kwh = %.2f", session_wh, total_kwh);
-        _session_wh = session_wh;
-        _total_kwh = total_kwh;
+        if(RAPI_RESPONSE_OK == ret)
+        {
+          DBUGF("session_wh = %.2f, total_kwh = %.2f", session_wh, total_kwh);
+          _session_wh = session_wh;
+          _total_kwh = total_kwh;
 
-        _data_ready.ready(EVSE_MONITOR_ENERGY_DATA_READY);
-      }
-    });
+          _data_ready.ready(EVSE_MONITOR_ENERGY_DATA_READY);
+        }
+      });
+    } else {
+      _data_ready.ready(EVSE_MONITOR_ENERGY_DATA_READY);
+    }
   }
 
   _count ++;
@@ -329,7 +352,7 @@ unsigned long EvseMonitor::loop(MicroTasks::WakeReason reason)
 
 bool EvseMonitor::begin(RapiSender &sender)
 {
-  OpenEVSE.begin(sender, [this](bool connected, const char *firmware, const char *protocol)
+  _openevse.begin(sender, [this](bool connected, const char *firmware, const char *protocol)
   {
     if(connected)
     {
