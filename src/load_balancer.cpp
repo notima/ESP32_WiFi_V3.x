@@ -42,6 +42,7 @@ void LoadBalancer::sendCommand(String topic, String command, std::function<void(
 void LoadBalancer::setCurrent(int current, std::function<void()> onSuccess){
     String cmd = "$SC ";
     cmd.concat(current);
+    cmd.concat(" V"); // Prevents the current from being saved to the EEPROM
     rapiSender.sendCmd(cmd, [onSuccess](int ret) {
         if(RAPI_RESPONSE_OK == ret) {
             onSuccess();
@@ -126,6 +127,7 @@ unsigned long LoadBalancer::loop(MicroTasks::WakeReason reason){
             safetyCheck([this](boolean otherAwake){
                 String currentStr = "";
                 currentStr.concat(safe_current_level);
+                currentStr.concat(" V"); // Don't save new current to EEPROM
                 sendCommand(load_balancing_topics + RAPI_SET_CURRENT, currentStr, [this, otherAwake](boolean ok, String result){
                     if(ok){
                         status = LOAD_BALANCER_STATUS_STARTING;
