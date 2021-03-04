@@ -184,7 +184,9 @@ loop() {
           DEBUG.printf("%s: Free memory %u - diff %d %d\n", time_format_time(time(NULL)).c_str(), current, diff, start_mem - current);
           last_mem = current;
         }
-        rfid.wakeup();
+        if(config_rfid_enabled()){
+          rfid.wakeup();
+        }
         Timer4 = millis();
       }
     }
