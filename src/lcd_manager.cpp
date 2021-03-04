@@ -115,4 +115,10 @@ void LcdManager::enableFlipBook(boolean enabled){
     flipBookEnabled = enabled;
 }
 
+void LcdManager::setColor(uint8_t color){
+    String cmd = "$FB ";
+    cmd.concat(color);
+    rapiSender.sendCmd(cmd);
+}
+
 LcdManager lcdManager;
