@@ -122,6 +122,11 @@ unsigned long RfidTask::loop(MicroTasks::WakeReason reason){
         }
         evseState = state;
     }
+
+    if(state < OPENEVSE_STATE_SLEEPING && !isAuthenticated()){
+        rapiSender.sendCmd(F("$F1"));
+        rapiSender.sendCmd(config_pause_uses_disabled() ? F("$FD") : F("$FS"));
+    }
     
     boolean foundCard = (state >= OPENEVSE_STATE_SLEEPING || waitingForTag) && nfc.scan();
 
