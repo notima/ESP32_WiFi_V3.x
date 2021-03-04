@@ -16,6 +16,7 @@
 #include "espal.h"
 #include "lcd.h"
 #include "sleep_timer.h"
+#include "rfid.h"
 
 #include "LedManagerTask.h"
 
@@ -83,6 +84,9 @@ long watthour_total = 0;
 
 void create_rapi_json(JsonDocument &doc)
 {
+  if(config_rfid_enabled()) {
+    doc["authenticated"] = rfid.getAuthenticatedTag();
+  }
   doc["amp"] = amp * AMPS_SCALE_FACTOR;
   doc["voltage"] = voltage * VOLTS_SCALE_FACTOR;
   doc["pilot"] = pilot;
@@ -314,6 +318,10 @@ void input_setup()
   {
     lcd_release();
     sleepTimer.onStateChange(evse_state);
+
+    if(evse_state >= OPENEVSE_STATE_SLEEPING){
+      rfid.resetAuthentication();
+    }
 
     // Update our global state
     DBUGVAR(evse_state);

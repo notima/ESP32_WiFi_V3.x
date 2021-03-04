@@ -42,13 +42,13 @@ boolean RfidTask::wakeup(){
 
 void RfidTask::scanCard(){
     NFCcard = nfc.getInformation();
-    String uidHex = nfc.readUid();
+    String uid = nfc.readUid();
 
     if(waitingForTag > 0){
         waitingForTag = 0;
         cardFound = true;
         lcdManager.display("Tag detected!", 0, 0, 3000);
-        lcdManager.display(uidHex, 0, 1, 3000);
+        lcdManager.display(uid, 0, 1, 3000);
     }else{
         // Check if tag is stored locally
         char storedTags[rfid_storage.length() + 1];
@@ -58,8 +58,9 @@ void RfidTask::scanCard(){
         {
             String storedTagStr = storedTag;
             storedTagStr.replace(" ", "");
-            uidHex.trim();
-            if(storedTagStr.compareTo(uidHex) == 0){
+            uid.trim();
+            if(storedTagStr.compareTo(uid) == 0){
+                authenticatedTag = uid;
                 if(config_load_balancing_enabled()){
                     loadBalancer.wakeup();
                 }else{
@@ -72,7 +73,7 @@ void RfidTask::scanCard(){
 
         // Send to MQTT broker
         DynamicJsonDocument data(4096);
-        data["rfid"] = uidHex;
+        data["rfid"] = uid;
         mqtt_publish(data);
     }
 }
@@ -115,6 +116,18 @@ unsigned long RfidTask::loop(MicroTasks::WakeReason reason){
 
 uint8_t RfidTask::getStatus(){
     return status;
+}
+
+bool RfidTask::isAuthenticated(){
+    return !authenticatedTag.isEmpty();
+}
+
+String RfidTask::getAuthenticatedTag(){
+    return authenticatedTag;
+}
+
+void RfidTask::resetAuthentication(){
+    authenticatedTag = "";
 }
 
 void RfidTask::waitForTag(uint8_t seconds){

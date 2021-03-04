@@ -3,8 +3,9 @@
 #include "lcd.h"
 #include "app_config.h"
 #include "debug.h"
+#include "lcd_manager.h"
+#include "rfid.h"
 #include <openevse.h>
-#include <lcd_manager.h>
 
 SleepTimer::SleepTimer() : MicroTasks::Task() {
 
@@ -69,6 +70,10 @@ void SleepTimer::stopTimer() {
 void SleepTimer::onStateChange(uint8_t state){
     DEBUG.printf("State changed to: %d\n", state);
     stopTimer();
+
+    if(state >= OPENEVSE_STATE_SLEEPING){
+      rfid.resetAuthentication();
+    }
 
     if(evseState >= OPENEVSE_STATE_SLEEPING && state == OPENEVSE_STATE_NOT_CONNECTED && config_rfid_enabled){
         if((sleep_timer_enabled_flags & SLEEP_TIMER_NOT_CONNECTED_FLAG) == SLEEP_TIMER_NOT_CONNECTED_FLAG){
