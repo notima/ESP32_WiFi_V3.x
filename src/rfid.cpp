@@ -83,15 +83,21 @@ unsigned long RfidTask::loop(MicroTasks::WakeReason reason){
         return MicroTask.WaitForMask;
     }
 
-    if(isAuthenticated() && state >= OPENEVSE_STATE_SLEEPING){
+    if(isAuthenticated() && state >= OPENEVSE_STATE_SLEEPING && loadBalancer.getStatus() == LOAD_BALANCER_STATUS_IDLE){
         lcdManager.setColor(LCD_COLOR_YELLOW);
         if(allowedToStart()){
             DEBUG.println("STARING");
-            lcdManager.release();
             if(config_load_balancing_enabled()){
                 loadBalancer.wakeup();
             }else{
-                rapiSender.sendCmd(F("$FE"));
+                if(rapiSender.sendCmdSync(F("$FE")) == 0){
+                    lcdManager.release();
+                }else{
+                    lcdManager.claim([](LcdManager::Lcd *lcd){
+                        lcd->display("Failed to start", 0, 0);
+                        lcd->display("", 0, 1);
+                    }, 10000);
+                }
             }
         } else {
             DEBUG.println("NOT STARTING");
@@ -105,10 +111,14 @@ unsigned long RfidTask::loop(MicroTasks::WakeReason reason){
                     msg.concat(":");
                     msg.concat(startMn);
                     lcd->display(msg, 0, 1);
+                    if(state < OPENEVSE_STATE_SLEEPING){
+                        lcdManager.release();
+                        lcd->release();
+                    }
                 }
-            }, 5000);
+            }, 10000);
         }
-        return 5000;
+        return 10000;
     }
 
     if(state != evseState){

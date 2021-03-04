@@ -3,6 +3,12 @@
 
 #include <functional>
 
+#define LOAD_BALANCER_STATUS_IDLE 0
+#define LOAD_BALANCER_STATUS_WAKING 1
+#define LOAD_BALANCER_STATUS_WAITING 2
+#define LOAD_BALANCER_STATUS_TIMEOUT 3
+#define LOAD_BALANCER_STATUS_STARTING 4
+
 class LoadBalancer : public MicroTasks::Task {
     private:
         uint8_t status;
@@ -31,6 +37,7 @@ class LoadBalancer : public MicroTasks::Task {
         void begin();
         void wakeup();
         void reportRapiResult(String device, String result);
+        uint8_t getStatus();
 };
 
 extern LoadBalancer loadBalancer;

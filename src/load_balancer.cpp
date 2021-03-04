@@ -16,12 +16,6 @@
 #define MQTT_TIMEOUT_MSG "     Unable to determine a safe current level. "
 #define WAITING_FOR_CURRENT_MSG "     Charging will start when current is available. "
 
-#define LOAD_BALANCER_STATUS_IDLE 0
-#define LOAD_BALANCER_STATUS_WAKING 1
-#define LOAD_BALANCER_STATUS_WAITING 2
-#define LOAD_BALANCER_STATUS_TIMEOUT 3
-#define LOAD_BALANCER_STATUS_STARTING 4
-
 LoadBalancer::LoadBalancer() :
   MicroTasks::Task() {
 }
@@ -207,6 +201,10 @@ void LoadBalancer::reportRapiResult(String device, String result){
         mqtt_log_error(msg);
     }
     rapi_callback(ok, result);
+}
+
+uint8_t LoadBalancer::getStatus(){
+    return status;
 }
 
 LoadBalancer loadBalancer;
