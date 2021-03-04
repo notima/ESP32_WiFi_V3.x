@@ -61,11 +61,7 @@ void RfidTask::scanCard(){
             uid.trim();
             if(storedTagStr.compareTo(uid) == 0){
                 authenticatedTag = uid;
-                if(config_load_balancing_enabled()){
-                    loadBalancer.wakeup();
-                }else{
-                    rapiSender.sendCmd(F("$FE"));
-                }
+                lcdManager.setColor(LCD_COLOR_YELLOW);
                 break;
             }
             storedTag = strtok(NULL, ",");
@@ -85,6 +81,34 @@ unsigned long RfidTask::loop(MicroTasks::WakeReason reason){
         if(status != RFID_STATUS_NOT_FOUND)
             status = RFID_STATUS_NOT_ENABLED;
         return MicroTask.WaitForMask;
+    }
+
+    if(isAuthenticated() && state >= OPENEVSE_STATE_SLEEPING){
+        lcdManager.setColor(LCD_COLOR_YELLOW);
+        if(allowedToStart()){
+            DEBUG.println("STARING");
+            lcdManager.release();
+            if(config_load_balancing_enabled()){
+                loadBalancer.wakeup();
+            }else{
+                rapiSender.sendCmd(F("$FE"));
+            }
+        } else {
+            DEBUG.println("NOT STARTING");
+            lcdManager.claim([](LcdManager::Lcd *lcd){
+                lcd->display("Charging will", 0, 0);
+                if(rapiSender.sendCmdSync(F("$GD")) == 0){
+                    uint8_t startHr = String(rapiSender.getToken(1)).toInt();
+                    uint8_t startMn = String(rapiSender.getToken(2)).toInt();
+                    String msg = "start at ";
+                    msg.concat(startHr);
+                    msg.concat(":");
+                    msg.concat(startMn);
+                    lcd->display(msg, 0, 1);
+                }
+            }, 5000);
+        }
+        return 5000;
     }
 
     if(state != evseState){
@@ -112,6 +136,45 @@ unsigned long RfidTask::loop(MicroTasks::WakeReason reason){
     }
 
     return nextScan;
+}
+
+boolean RfidTask::allowedToStart(){
+    boolean allowedToStart = false;
+    if(rapiSender.sendCmdSync(F("$GD")) == 0){
+        uint8_t startHr = String(rapiSender.getToken(1)).toInt();
+        uint8_t startMn = String(rapiSender.getToken(2)).toInt();
+        uint8_t stopHr = String(rapiSender.getToken(3)).toInt();
+        uint8_t stopMn = String(rapiSender.getToken(4)).toInt();
+        uint16_t startTime = startHr * 60 + startMn;
+        uint16_t stopTime = stopHr * 60 + stopMn;
+        if(rapiSender.sendCmdSync(F("$GT")) == 0){
+            uint8_t hour = String(rapiSender.getToken(4)).toInt();
+            uint8_t minute = String(rapiSender.getToken(5)).toInt();
+            uint16_t currentTime = hour * 60 + minute;
+
+            if(startTime < stopTime){
+                allowedToStart = currentTime >= startTime && currentTime < stopTime;
+            }else{
+                allowedToStart = currentTime >= startTime || currentTime < stopTime;
+            }
+
+            DEBUG.print("Start: ");
+            DEBUG.print(startHr);
+            DEBUG.print(":");
+            DEBUG.println(startMn);
+            DEBUG.print("Stop: ");
+            DEBUG.print(stopHr);
+            DEBUG.print(":");
+            DEBUG.println(stopMn);
+            DEBUG.print("Now: ");
+            DEBUG.print(hour);
+            DEBUG.print(":");
+            DEBUG.println(minute);
+            DEBUG.print("allowed to start? ");
+            DEBUG.println(allowedToStart);
+        }
+    }
+    return allowedToStart;
 }
 
 uint8_t RfidTask::getStatus(){
