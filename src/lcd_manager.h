@@ -15,20 +15,23 @@
 class LcdManager : MicroTasks::Task{
     public:
         class Lcd;
-    private:
-        class InfoPage{
+        class Message{
             public:
             std::function<void(Lcd *lcd)> onUpdate;
             uint16_t updateInterval;
-            InfoPage(std::function<void(Lcd *lcd)> onUpdate, uint16_t updateInterval);
+            int time;
+            Message(std::function<void(Lcd *lcd)> onUpdate, uint16_t updateInterval, int time = 0);
+            Message();
         };
-        InfoPage evsePage;
-        InfoPage pages[4] = {evsePage, evsePage, evsePage, evsePage};
+    private:
+        Message evsePage;
+        Message pages[4] = {evsePage, evsePage, evsePage, evsePage};
         Lcd *lcd;
         boolean flipBookEnabled = true;
         int updateInterval = 1000;
         std::function<void(Lcd *lcd)> onScreenUpdate = [](Lcd *lcd){};
         unsigned long releaseTime = ULONG_MAX;
+        
 
     protected:
         void setup();
@@ -50,6 +53,8 @@ class LcdManager : MicroTasks::Task{
         void release();
         void display(String message, uint8_t x, uint8_t y, int time, boolean clearLine = true);
         void clearPages();
+        void queue(std::function<void(Lcd *lcd)> onScreenUpdate, int time, int updateInterval = 1000);
+        void clearQueue();
         void enableFlipBook(boolean enabled);
         void setColor(uint8_t color);
 };

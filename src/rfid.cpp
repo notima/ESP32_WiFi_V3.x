@@ -90,6 +90,7 @@ unsigned long RfidTask::loop(MicroTasks::WakeReason reason){
             if(config_load_balancing_enabled()){
                 loadBalancer.wakeup();
             }else{
+                rapiSender.sendCmdSync(F("$F1"));
                 if(rapiSender.sendCmdSync(F("$FE")) == 0){
                     lcdManager.release();
                 }else{
@@ -172,21 +173,6 @@ boolean RfidTask::allowedToStart(){
             }else{
                 allowedToStart = currentTime >= startTime || currentTime < stopTime;
             }
-
-            DEBUG.print("Start: ");
-            DEBUG.print(startHr);
-            DEBUG.print(":");
-            DEBUG.println(startMn);
-            DEBUG.print("Stop: ");
-            DEBUG.print(stopHr);
-            DEBUG.print(":");
-            DEBUG.println(stopMn);
-            DEBUG.print("Now: ");
-            DEBUG.print(hour);
-            DEBUG.print(":");
-            DEBUG.println(minute);
-            DEBUG.print("allowed to start? ");
-            DEBUG.println(allowedToStart);
         }
     }
     return allowedToStart;

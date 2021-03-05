@@ -35,6 +35,7 @@ typedef const __FlashStringHelper *fstr_t;
 #include "time_man.h"
 #include "tesla_client.h"
 #include "rfid.h"
+#include "lcd_manager.h"
 
 MongooseHttpServer server;          // Create class for Web server
 
@@ -837,9 +838,8 @@ handleUpdateUpload(MongooseHttpServerRequest *request, int ev, MongooseString fi
 
     DEBUG_PORT.printf("Update Start: %s\n", filename.c_str());
 
-    lcd_display(F("Updating WiFi"), 0, 0, 0, LCD_CLEAR_LINE);
-    lcd_display(F(""), 0, 1, 10 * 1000, LCD_CLEAR_LINE);
-    lcd_loop();
+    lcdManager.display(F("Updating WiFi"), 0, 0, 0);
+    lcdManager.display(F(""), 0, 1, 10 * 1000);
 
     if(!Update.begin()) {
       handleUpdateError(request);
@@ -859,7 +859,7 @@ handleUpdateUpload(MongooseHttpServerRequest *request, int ev, MongooseString fi
       DBUGVAR(lastPercent);
       if(percent != lastPercent) {
         String text = String(percent) + F("%");
-        lcd_display(text, 0, 1, 10 * 1000, LCD_DISPLAY_NOW);
+        lcdManager.display(text, 0, 1, 10 * 1000);
         DEBUG_PORT.printf("Update: %d%%\n", percent);
         lastPercent = percent;
       }

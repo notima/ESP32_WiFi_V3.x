@@ -124,8 +124,10 @@ void setup()
 
   input_setup();
 
-  lcdManager.display("OpenEVSE WiFI", 0, 0, 0);
-  lcdManager.display(currentfirmware, 0, 1, 5 * 1000);
+  lcdManager.queue([](LcdManager::Lcd * lcd){
+    lcd->display("OpenEVSE WiFI", 0, 0);
+    lcd->display(currentfirmware, 0, 1);
+  }, 5000, 5000);
 
   start_mem = last_mem = ESPAL.getFreeHeap();
 } // end setup

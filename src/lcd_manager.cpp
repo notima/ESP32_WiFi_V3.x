@@ -1,19 +1,23 @@
 #include <lcd_manager.h>
 #include <debug.h>
 #include <input.h>
+#include <queue>
 
 #define LCD_INFO_PAGES 4
 #define TIME_PER_PAGE 2
 #define LCD_MAX_LEN 16
 
-LcdManager::InfoPage::InfoPage(std::function<void(Lcd *lcd)> onUpdate, uint16_t updateInterval) {
+std::queue<LcdManager::Message> messageQueue;
+
+LcdManager::Message::Message(std::function<void(Lcd *lcd)> onUpdate, uint16_t updateInterval, int time) {
     this->onUpdate = onUpdate;
     this->updateInterval = min(updateInterval, (uint16_t)(TIME_PER_PAGE * 1000));
+    this->time = time;
 }
 
-LcdManager::Lcd::Lcd(){
+LcdManager::Message::Message() {}
 
-}
+LcdManager::Lcd::Lcd(){}
 
 void LcdManager::Lcd::display(String message, uint8_t x, uint8_t y, boolean clearLine) {
     if(!claimed){
@@ -52,7 +56,7 @@ void LcdManager::Lcd::release() {
 }
 
 LcdManager::LcdManager() : MicroTasks::Task(),
-evsePage(InfoPage([](Lcd *lcd){lcd->release();}, TIME_PER_PAGE * 1000)),
+evsePage(Message([](Lcd *lcd){lcd->release();}, TIME_PER_PAGE * 1000)),
 lcd(new Lcd()) {
 }
 
@@ -65,9 +69,24 @@ void LcdManager::setup() {
 }
 
 unsigned long LcdManager::loop(MicroTasks::WakeReason reason) {
+    if(state == OPENEVSE_STATE_STARTING) {
+        return 1000;
+    }
     if(millis() >= releaseTime){
-        flipBookEnabled = true;
-        releaseTime = ULONG_MAX;
+        if(messageQueue.empty()){
+            flipBookEnabled = true;
+            releaseTime = ULONG_MAX;
+        } else {
+            flipBookEnabled = false;
+            Message msg = messageQueue.front();
+            onScreenUpdate = msg.onUpdate;
+            msg.onUpdate(lcd);
+            updateInterval = msg.updateInterval;
+            releaseTime = millis() + msg.time;
+            messageQueue.pop();
+        }
+    }else if(!messageQueue.empty()){
+        releaseTime = 0;
     }
     if(flipBookEnabled){
         uint8_t currentPage = millis() / TIME_PER_PAGE / 1000 % LCD_INFO_PAGES;
@@ -79,7 +98,7 @@ unsigned long LcdManager::loop(MicroTasks::WakeReason reason) {
 }
 
 void LcdManager::addInfoPage(uint8_t index, std::function<void(Lcd *lcd)> onScreenUpdate, uint16_t updateInterval) {
-    InfoPage page(onScreenUpdate, updateInterval);
+    Message page(onScreenUpdate, updateInterval);
     pages[index] = page;
 }
 
@@ -109,6 +128,16 @@ void LcdManager::clearPages(){
     for(int i = 0; i < LCD_INFO_PAGES; i++){
         pages[i] = evsePage;
     }
+}
+
+void LcdManager::queue(std::function<void(Lcd *lcd)> onScreenUpdate, int time, int updateInterval) {
+    Message msg = Message(onScreenUpdate, updateInterval, time);
+    DEBUG.println("Enqueuing message");
+    messageQueue.push(msg);
+}
+
+void LcdManager::clearQueue() {
+    //messageQueue.clear();
 }
 
 void LcdManager::enableFlipBook(boolean enabled){

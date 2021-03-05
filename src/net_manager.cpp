@@ -140,11 +140,14 @@ static void net_wifi_start()
 
 static void display_state()
 {
-  lcdManager.display(F("Hostname:"), 0, 0, 0);
-  lcdManager.display(esp_hostname.c_str(), 0, 1, 5000);
-
-  lcdManager.display(F("IP Address:"), 0, 0, 0);
-  lcdManager.display(ipaddress.c_str(), 0, 1, 5000);
+  lcdManager.queue([](LcdManager::Lcd *lcd){
+    lcd->display(F("Hostname:"), 0, 0);
+    lcd->display(esp_hostname.c_str(), 0, 1);
+  }, 5000, 5000);
+  lcdManager.queue([](LcdManager::Lcd *lcd){
+    lcd->display(F("IP Address:"), 0, 0);
+    lcd->display(ipaddress.c_str(), 0, 1);
+  }, 5000, 5000);
 }
 
 static void net_connected(IPAddress myAddress)
@@ -221,8 +224,10 @@ static void net_wifi_onStationModeDisconnected(const WiFiEventStationModeDisconn
 }
 
 static void net_wifi_onAPModeStationConnected(const WiFiEventSoftAPModeStationConnected &event) {
-  lcdManager.display(F("IP Address"), 0, 0, 0);
-  lcdManager.display(ipaddress, 0, 1, (0 == apClients ? 15 : 5) * 1000);
+  lcdManager.queue([](LcdManager::Lcd *lcd){
+    lcd->display(F("IP Address"), 0, 0);
+    lcd->display(ipaddress, 0, 1);
+  }, 5000, (0 == apClients ? 15 : 5) * 1000);
 
   ledManager.setWifiMode(false, true);
 
