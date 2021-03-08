@@ -60,7 +60,14 @@ void RfidTask::scanCard(){
             storedTagStr.replace(" ", "");
             uid.trim();
             if(storedTagStr.compareTo(uid) == 0){
-                authenticatedTag = uid;
+                if(!isAuthenticated()){
+                    authenticatedTag = uid;
+                }else if(uid == authenticatedTag){
+                    resetAuthentication();
+                    lcdManager.setColor(LCD_COLOR_RED);
+                    lcdManager.display("Cancelled", 0, 0, 0);
+                    lcdManager.display("", 0, 1, 2000);
+                }
                 lcdManager.setColor(LCD_COLOR_YELLOW);
                 break;
             }
@@ -86,7 +93,6 @@ unsigned long RfidTask::loop(MicroTasks::WakeReason reason){
     if(isAuthenticated() && state >= OPENEVSE_STATE_SLEEPING && loadBalancer.getStatus() == LOAD_BALANCER_STATUS_IDLE){
         lcdManager.setColor(LCD_COLOR_YELLOW);
         if(allowedToStart()){
-            DEBUG.println("STARING");
             if(config_load_balancing_enabled()){
                 loadBalancer.wakeup();
             }else{
@@ -101,8 +107,7 @@ unsigned long RfidTask::loop(MicroTasks::WakeReason reason){
                 }
             }
         } else {
-            DEBUG.println("NOT STARTING");
-            lcdManager.claim([](LcdManager::Lcd *lcd){
+            lcdManager.claim([this](LcdManager::Lcd *lcd){
                 lcd->display("Charging will", 0, 0);
                 if(rapiSender.sendCmdSync(F("$GD")) == 0){
                     uint8_t startHr = String(rapiSender.getToken(1)).toInt();
@@ -117,9 +122,8 @@ unsigned long RfidTask::loop(MicroTasks::WakeReason reason){
                         lcd->release();
                     }
                 }
-            }, 10000);
+            }, 1000);
         }
-        return 10000;
     }
 
     if(state != evseState){
@@ -139,7 +143,7 @@ unsigned long RfidTask::loop(MicroTasks::WakeReason reason){
         rapiSender.sendCmd(config_pause_uses_disabled() ? F("$FD") : F("$FS"));
     }
     
-    boolean foundCard = (state >= OPENEVSE_STATE_SLEEPING || waitingForTag) && nfc.scan();
+    boolean foundCard = nfc.scan();
 
     if(foundCard && !hasContact){
         scanCard();
@@ -191,7 +195,7 @@ String RfidTask::getAuthenticatedTag(){
 }
 
 void RfidTask::resetAuthentication(){
-    authenticatedTag = "";
+    authenticatedTag = emptyString;
 }
 
 void RfidTask::waitForTag(uint8_t seconds){
