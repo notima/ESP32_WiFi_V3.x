@@ -113,9 +113,12 @@ unsigned long RfidTask::loop(MicroTasks::WakeReason reason){
                     uint8_t startHr = String(rapiSender.getToken(1)).toInt();
                     uint8_t startMn = String(rapiSender.getToken(2)).toInt();
                     String msg = "start at ";
-                    msg.concat(startHr);
+                    char buf[3];
+                    sprintf(buf, "%02d", startHr);
+                    msg.concat(buf);
                     msg.concat(":");
-                    msg.concat(startMn);
+                    sprintf(buf, "%02d", startMn);
+                    msg.concat(buf);
                     lcd->display(msg, 0, 1);
                     if(state < OPENEVSE_STATE_SLEEPING){
                         lcdManager.release();
